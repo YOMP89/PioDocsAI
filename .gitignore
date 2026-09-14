@@ -1,0 +1,12 @@
+# Secretos
+backend/.env
+
+# Backend
+backend/__pycache__/
+backend/**/__pycache__/
+backend/data/eduapp.db
+backend/data/eduapp.db-*
+
+# Frontend
+frontend/node_modules/
+frontend/.next/

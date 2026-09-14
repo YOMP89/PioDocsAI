@@ -1,0 +1,35 @@
+﻿Diccionario de codificación — variables categóricas,
+,
+"Curso (texto, conserva ceros iniciales en preescolar)",
+01,Prejardín
+02,Jardín
+03,Transición
+1,Primero
+2,Segundo
+3,Tercero
+4,Cuarto
+5,Quinto
+6,Sexto
+7,Séptimo
+8,Octavo
+9,Noveno
+10,Décimo
+11,Undécimo
+,
+Sexo (numérico),
+1,Mujer (femenino)
+2,Hombre (masculino)
+,
+Estado (numérico),
+1,Aprobado (equivale a 'alcanzó' en el origen)
+2,No aprobado (equivale a 'fallido' en el origen)
+,
+Periodo (numérico),
+"1, 2, 3, 4",Periodo académico dentro del año lectivo
+,
+Código del estudiante,
+Regla,"Se insertan los 2 últimos dígitos del año inicial del periodo lectivo justo después de los 2 primeros dígitos del código original, sin eliminar ningún dígito. Ej.: código 71003 en el año 2020-2021 -> 7120003."
+Reversible,Sí: el código original se recupera quitando las posiciones 3 y 4 del código nuevo.
+Colisiones,Ninguna: verificado que cada estudiante conserva un código único dentro de cada año.
+,
+"Nota: 'Curso' se dejó como texto porque 01/02/03 (preescolar) numéricamente coinciden con 1/2/3 (Primero/Segundo/Tercero). Si el modelo de ML necesita una columna puramente numérica sin ese riesgo de colisión, se recomienda una escala continua alterna (p. ej. Prejardín=-2, Jardín=-1, Transición=0, Primero=1 ... Undécimo=11).",

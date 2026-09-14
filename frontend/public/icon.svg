@@ -1,0 +1,14 @@
+<svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- barras del grafico, saliendo del libro -->
+  <rect x="17.5" y="17" width="7" height="13" rx="1.4" fill="#1337A2"/>
+  <rect x="28.5" y="9" width="7" height="21" rx="1.4" fill="#1337A2"/>
+  <rect x="39.5" y="13" width="7" height="17" rx="1.4" fill="#1337A2"/>
+
+  <!-- libro abierto (misma geometria del icono "book-open" de lucide-react,
+       usado en el resto de la interfaz) -->
+  <g transform="translate(10.4 22.6) scale(1.8)" stroke="#4A3728" stroke-width="2"
+     stroke-linecap="round" stroke-linejoin="round" fill="none">
+    <path d="M12 7v14" />
+    <path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z" />
+  </g>
+</svg>

@@ -1,0 +1,34 @@
+﻿Consolidado académico 2020-2025 — Colegio Franciscano Pío XII
+""
+Origen: 20 archivos (5 años lectivos x 4 periodos) en la carpeta nueva_version_datos.
+"Formato: una fila por estudiante, materia y periodo (formato largo)."
+""
+"Orden del consolidado: Código del estudiante -> Año (cronológico) -> Periodo (1 a 4),"
+de modo que cada estudiante queda agrupado con continuidad entre periodos y entre años.
+""
+Limpieza aplicada sobre los archivos originales (sin modificar los archivos fuente):
+"- Se rellenaron hacia abajo (forward-fill) Código, Sexo, Curso y Sección dentro de cada"
+"  bloque de estudiante, ya que en el archivo original solo aparecen en la primera fila."
+- Se eliminaron filas de resumen tipo 'N estudiantes' que interrumpen los bloques de datos.
+- Se eliminaron encabezados de columna repetidos por quiebre de página/sección.
+- Se eliminaron filas sin materia registrada (vacías).
+""
+Filas válidas en el consolidado: 126.900
+"Códigos de estudiante únicos (año + código, tras la codificación): 2913"
+""
+Codificación para tratamiento en ML (ver hoja 'Diccionario' para el detalle completo):
+"- Periodo: numérico 1, 2, 3 o 4 (antes 'Periodo 1'...'Periodo 4')."
+"- Sexo: 1 = mujer, 2 = hombre."
+"- Estado: 1 = aprobado (antes 'alcanzó'), 2 = no aprobado (antes 'fallido')."
+- Curso: código de texto 01/02/03 para preescolar (Prejardín/Jardín/Transición) y 1 a 11
+  para Primero a Undécimo.
+- Código del estudiante: se insertan los 2 últimos dígitos del año inicial del periodo
+  lectivo justo después de los 2 primeros dígitos del código original (sin eliminar
+  ningún dígito). Ej.: 71003 en 2020-2021 -> 7120003. El código queda distinto por año
+  para el mismo estudiante (deja de ser un identificador estable entre años); si se
+"  necesita rastrear al mismo estudiante entre años, usar los 2 primeros y los dígitos"
+  posteriores a la posición 4 del código (equivalen al código original de la matrícula).
+""
+Notas:
+"- 'Valor' es siempre numérico (escala 1.0-5.0). 'Nota' es numérica salvo en Transición,"
+"  Jardín y Prejardín, donde el colegio evalúa de forma cualitativa (ej. 'Desarrollo alcanzado')."
