@@ -24,8 +24,8 @@ import { api, type ChartSpec, type ChatTurn } from '@/lib/api'
 type Mensaje = ChatTurn & { chart?: ChartSpec | null; error?: boolean }
 
 // Paleta academica vivida (azul institucional, coral, amarillo dorado) +
-// esmeralda/violeta/turquesa auxiliares para series adicionales.
-const COLORES = ['#1670FF', '#FB5072', '#FFBC2B', '#10b981', '#8b5cf6', '#14b8a6']
+// esmeralda/violeta/turquesa/naranja auxiliares para series adicionales.
+const COLORES = ['#1670FF', '#FB5072', '#FFBC2B', '#10b981', '#8b5cf6', '#14b8a6', '#f97316']
 
 function chartAFilas(chart: ChartSpec) {
   return chart.etiquetas.map((etiqueta, i) => {
@@ -141,13 +141,13 @@ export function AssistantWidget() {
     <>
       {abierto && (
         <div className="fixed bottom-24 right-6 z-40 flex h-[32rem] w-[23rem] max-w-[calc(100vw-3rem)] flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl">
-          <div className="flex items-center gap-2 border-b border-slate-100 bg-linear-to-r from-blue-600 to-blue-800 px-4 py-3 text-white">
-            <BookOpen size={18} />
+          <div className="flex items-center gap-2 border-b border-slate-100 bg-linear-to-r from-violet-600 to-blue-700 px-4 py-3 text-white">
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/20"><BookOpen size={16} /></div>
             <div className="flex-1">
               <p className="text-sm font-bold leading-tight">Pío Docs</p>
               <p className="text-[13px] leading-tight text-blue-100">Responde con tus datos reales</p>
             </div>
-            <button onClick={() => setAbierto(false)} aria-label="Cerrar Pío Docs" className="rounded-lg p-1 hover:bg-white/10">
+            <button onClick={() => setAbierto(false)} aria-label="Cerrar Pío Docs" className="rounded-lg p-1 transition hover:bg-white/20">
               <X size={16} />
             </button>
           </div>
@@ -181,13 +181,13 @@ export function AssistantWidget() {
               onChange={(e) => setEntrada(e.target.value)}
               placeholder="Ej: ¿cuáles son las materias con más riesgo?"
               disabled={enviando}
-              className="flex-1 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm outline-none focus:border-blue-400 focus:bg-white"
+              className="flex-1 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm outline-none transition focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-500/15"
             />
             <button
               type="submit"
               disabled={enviando || !entrada.trim()}
               aria-label="Enviar"
-              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-linear-to-br from-blue-500 to-blue-700 text-white shadow-sm shadow-blue-600/30 transition hover:from-blue-600 hover:to-blue-800 disabled:opacity-40"
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-linear-to-br from-violet-500 to-blue-600 text-white shadow-sm shadow-violet-600/18 transition hover:from-violet-600 hover:to-blue-700 active:from-violet-700 active:to-blue-800 disabled:opacity-40"
             >
               <Send size={16} />
             </button>
@@ -198,7 +198,7 @@ export function AssistantWidget() {
       <button
         onClick={() => setAbierto((v) => !v)}
         aria-label={abierto ? 'Cerrar Pío Docs' : 'Abrir Pío Docs'}
-        className={`fixed bottom-6 right-6 z-40 flex h-14 w-14 items-center justify-center overflow-hidden rounded-full bg-white shadow-lg ring-4 ring-white transition hover:scale-105 ${abierto ? '' : 'animate-bot-bounce'}`}
+        className={`fixed bottom-6 right-6 z-40 flex h-14 w-14 items-center justify-center overflow-hidden rounded-full bg-white shadow-lg ring-4 ring-white transition hover:scale-105 hover:shadow-violet-600/18 hover:ring-violet-100 ${abierto ? '' : 'animate-bot-bounce'}`}
       >
         {abierto ? (
           <X size={22} className="text-slate-700" />

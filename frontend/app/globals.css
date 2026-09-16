@@ -103,6 +103,26 @@
   --color-amber-950: #402600;
 }
 
+/* Jerarquia visual de textos (referencia: modelo.png). Todo el texto neutro
+   de la app usa 'text-slate-{400..950}' (nunca border/bg-slate-400+, solo
+   50-200 para bordes y fondos — confirmado con grep antes de tocar esto), asi
+   que redefinir esta parte de la escala 'slate' aplica la jerarquia en toda
+   la interfaz sin editar cada className. Los colores vivos (rose/amber/
+   emerald/violet/teal) siguen intactos para estados y acentos, tal como se
+   pide: el azul aqui es SOLO para texto neutro, no reemplaza esos acentos.
+   950/900 -> azul marino/institucional (titulos principales, valores clave)
+   800/700 -> azul oscuro (informacion secundaria)
+   600/500/400 -> azul medio, con leve gradacion (texto auxiliar/captions) */
+@theme {
+  --color-slate-950: #081f52;
+  --color-slate-900: #0b3891;
+  --color-slate-800: #1b43ba;
+  --color-slate-700: #1b43ba;
+  --color-slate-600: #3a5a9e;
+  --color-slate-500: #5578b0;
+  --color-slate-400: #7a93be;
+}
+
 /* Forma: bordes mas redondeados, mas sombra/profundidad y mas espaciado.
    Igual que con colores y tipografia, se ajusta el token una sola vez y se
    propaga a toda la app sin tocar cada componente. */
@@ -111,11 +131,15 @@
   --radius-2xl: 1.3rem;
   --radius-3xl: 1.9rem;
 
-  /* shadow-sm/shadow/shadow-md/shadow-lg: antes muy sutiles (apenas visibles) */
-  --shadow-sm: 0 2px 8px -1px rgb(15 23 42 / 0.12), 0 2px 4px -2px rgb(15 23 42 / 0.10);
-  --shadow: 0 3px 10px -1px rgb(15 23 42 / 0.14), 0 2px 6px -2px rgb(15 23 42 / 0.10);
-  --shadow-md: 0 8px 20px -3px rgb(15 23 42 / 0.16), 0 4px 8px -4px rgb(15 23 42 / 0.12);
-  --shadow-lg: 0 16px 32px -6px rgb(15 23 42 / 0.18), 0 8px 14px -6px rgb(15 23 42 / 0.12);
+  /* shadow-sm/shadow/shadow-md/shadow-lg: se subieron mucho en un ajuste
+     anterior (paleta todavia neutra); con la cantidad de color/degradados
+     que tiene la interfaz ahora, esa misma profundidad se siente pesada —
+     se bajan a un nivel "premium sutil" (mas presencia que el default de
+     Tailwind, pero lejos de las 0.12-0.18 de antes). */
+  --shadow-sm: 0 2px 8px -1px rgb(15 23 42 / 0.07), 0 2px 4px -2px rgb(15 23 42 / 0.05);
+  --shadow: 0 3px 10px -1px rgb(15 23 42 / 0.08), 0 2px 6px -2px rgb(15 23 42 / 0.05);
+  --shadow-md: 0 8px 20px -3px rgb(15 23 42 / 0.09), 0 4px 8px -4px rgb(15 23 42 / 0.06);
+  --shadow-lg: 0 16px 32px -6px rgb(15 23 42 / 0.10), 0 8px 14px -6px rgb(15 23 42 / 0.06);
 
   /* Unidad base de la que salen TODOS los paddings/gaps/margenes (p-4, gap-6,
      space-y-3...): subirla ~15% da mas aire en toda la app de una sola vez. */
