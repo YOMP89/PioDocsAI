@@ -68,16 +68,28 @@ function RiskPill({ risk }: { risk: string }) {
 }
 
 function MetricCard({ title, value, helper, icon: Icon, tone = 'blue', trend }: { title: string; value: string; helper: string; icon: typeof Users; tone?: string; trend?: string }) {
-  const tones: Record<string, { card: string; chip: string }> = {
-    blue: { card: 'border-blue-100 bg-blue-50/60', chip: 'bg-blue-600 text-white shadow-sm shadow-blue-600/30' },
-    rose: { card: 'border-rose-100 bg-rose-50/60', chip: 'bg-rose-500 text-white shadow-sm shadow-rose-500/30' },
-    orange: { card: 'border-orange-100 bg-orange-50/60', chip: 'bg-orange-500 text-white shadow-sm shadow-orange-500/30' },
-    violet: { card: 'border-violet-100 bg-violet-50/60', chip: 'bg-violet-600 text-white shadow-sm shadow-violet-600/30' },
+  // Cada KPI tiene su propia identidad cromatica (azul electrico, coral,
+  // esmeralda, violeta, turquesa): fondo muy claro + degradado abstracto
+  // sutil (el "blob" difuminado en la esquina) + icono circular en color
+  // vivo. El numero grande se mantiene siempre oscuro/neutro por legibilidad.
+  const tones: Record<string, { border: string; wash: string; blob: string; chip: string; dot: string }> = {
+    blue: { border: 'border-blue-100', wash: 'from-blue-50 via-blue-50/40 to-white', blob: 'bg-blue-300/35', chip: 'bg-blue-600 shadow-blue-600/35', dot: 'bg-blue-500' },
+    rose: { border: 'border-rose-100', wash: 'from-rose-50 via-rose-50/40 to-white', blob: 'bg-rose-300/35', chip: 'bg-rose-500 shadow-rose-500/35', dot: 'bg-rose-500' },
+    emerald: { border: 'border-emerald-100', wash: 'from-emerald-50 via-emerald-50/40 to-white', blob: 'bg-emerald-300/35', chip: 'bg-emerald-500 shadow-emerald-500/35', dot: 'bg-emerald-500' },
+    violet: { border: 'border-violet-100', wash: 'from-violet-50 via-violet-50/40 to-white', blob: 'bg-violet-300/35', chip: 'bg-violet-600 shadow-violet-600/35', dot: 'bg-violet-500' },
+    teal: { border: 'border-teal-100', wash: 'from-teal-50 via-teal-50/40 to-white', blob: 'bg-teal-300/35', chip: 'bg-teal-500 shadow-teal-500/35', dot: 'bg-teal-500' },
   }
   const t = tones[tone] ?? tones.blue
-  return <div className={`rounded-2xl border ${t.card} p-5 shadow-sm shadow-slate-100/80`}>
-    <div className="flex items-start justify-between"><div><p className="text-sm font-medium text-slate-500">{title}</p><p className="mt-2 text-2xl font-bold tracking-tight text-slate-900">{value}</p></div><div className={`rounded-xl p-2.5 ${t.chip}`}><Icon size={19} strokeWidth={2} /></div></div>
-    <div className="mt-4 flex items-center gap-1.5 text-xs text-slate-500">{trend && <span className="flex items-center font-semibold text-emerald-600"><ArrowUpRight size={13} /> {trend}</span>}{helper}</div>
+  return <div className={`relative overflow-hidden rounded-2xl border ${t.border} bg-linear-to-br ${t.wash} p-5 shadow-sm shadow-slate-100/80`}>
+    <div className={`pointer-events-none absolute -right-8 -top-10 h-32 w-32 rounded-full blur-2xl ${t.blob}`} />
+    <div className="relative flex items-start justify-between">
+      <div>
+        <p className="flex items-center gap-1.5 text-sm font-medium text-slate-500"><span className={`h-1.5 w-1.5 shrink-0 rounded-full ${t.dot}`} />{title}</p>
+        <p className="mt-2 text-2xl font-bold tracking-tight text-slate-900">{value}</p>
+      </div>
+      <div className={`rounded-full p-2.5 text-white shadow-sm ${t.chip}`}><Icon size={19} strokeWidth={2} /></div>
+    </div>
+    <div className="relative mt-4 flex items-center gap-1.5 text-xs text-slate-500">{trend && <span className="flex items-center font-semibold text-emerald-600"><ArrowUpRight size={13} /> {trend}</span>}{helper}</div>
   </div>
 }
 
@@ -137,7 +149,7 @@ function Dashboard({ onStudent }: { onStudent: (sel: SeleccionEstudiante) => voi
     <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
       <MetricCard title="Estudiantes evaluados" value={String(summary.estudiantes_evaluados)} helper="con periodos 1 a 3 completos" icon={Users} tone="blue" />
       <MetricCard title="En riesgo alto" value={String(summary.estudiantes_en_riesgo_alto)} helper="requieren seguimiento" icon={AlertTriangle} tone="rose" />
-      <MetricCard title="Materias priorizadas" value={String(summary.materias_priorizadas)} helper="con al menos una alerta" icon={BookOpen} tone="orange" />
+      <MetricCard title="Materias priorizadas" value={String(summary.materias_priorizadas)} helper="con al menos una alerta" icon={BookOpen} tone="emerald" />
       <MetricCard title="Predicciones" value={summary.predicciones_totales.toLocaleString('es-CO')} helper="combinaciones estudiante-materia" icon={Activity} tone="violet" />
     </div>
     <div className="grid gap-6 xl:grid-cols-[1.35fr_1fr]">
@@ -371,7 +383,7 @@ function ModeloMLView() {
 
   return <div className="mx-auto max-w-3xl space-y-6">
     <div><p className="text-sm font-medium text-blue-600">Modelo de clasificación</p><h1 className="mt-1 text-3xl font-bold tracking-tight text-slate-950">Modelo ML</h1><p className="mt-2 text-sm leading-6 text-slate-500">Bosque aleatorio entrenado sobre el consolidado 2020-2025 (ver Proceso_ML_1_Clasificacion.ipynb, Fase 6 a 9).</p></div>
-    <div className="grid gap-4 sm:grid-cols-2"><MetricCard title="AUC (prueba)" value={info.auc_prueba != null ? info.auc_prueba.toFixed(3) : '—'} helper="capacidad de ordenar el riesgo" icon={Gauge} tone="violet" /><MetricCard title="Umbral de alerta" value={info.umbral_alerta != null ? info.umbral_alerta.toFixed(2) : '—'} helper="probabilidad minima para alertar" icon={BrainCircuit} tone="blue" /><MetricCard title="Filas de entrenamiento" value={info.filas_entrenamiento?.toLocaleString('es-CO') ?? '—'} helper="combinaciones estudiante-materia" icon={Database} tone="orange" /><MetricCard title="Entrenado" value={info.fecha_entrenamiento ?? '—'} helper={`periodo de corte: ${info.periodo_corte ?? '—'}`} icon={Activity} tone="rose" /></div>
+    <div className="grid gap-4 sm:grid-cols-2"><MetricCard title="AUC (prueba)" value={info.auc_prueba != null ? info.auc_prueba.toFixed(3) : '—'} helper="capacidad de ordenar el riesgo" icon={Gauge} tone="violet" /><MetricCard title="Umbral de alerta" value={info.umbral_alerta != null ? info.umbral_alerta.toFixed(2) : '—'} helper="probabilidad minima para alertar" icon={BrainCircuit} tone="blue" /><MetricCard title="Filas de entrenamiento" value={info.filas_entrenamiento?.toLocaleString('es-CO') ?? '—'} helper="combinaciones estudiante-materia" icon={Database} tone="teal" /><MetricCard title="Entrenado" value={info.fecha_entrenamiento ?? '—'} helper={`periodo de corte: ${info.periodo_corte ?? '—'}`} icon={Activity} tone="rose" /></div>
     {info.importancia_variables && <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
       <h2 className="font-bold text-slate-900">Importancia de variables</h2>
       <p className="mt-1 text-sm text-slate-500">Cuánto pesa cada variable en las predicciones del modelo (impureza Gini).</p>
