@@ -1,6 +1,8 @@
-"""Loop manual de tool use con Claude: el modelo decide que herramientas
-llamar (consultar datos reales de la BD, o pedir una grafica) hasta que
-responde con texto final. Ver app/assistant/tools.py para las definiciones.
+"""Loop manual de tool use con OpenAI (Responses API): el modelo decide que
+herramientas llamar (consultar datos reales de la BD, o pedir una grafica)
+hasta que responde con texto final. Ver app/assistant/tools.py para las
+definiciones. Se usa /v1/responses (no /v1/chat/completions) porque el modelo
+configurado (razonador) solo soporta function tools en ese endpoint.
 
 Tambien incluye explicar_prediccion(): una llamada directa (sin tools) que
 convierte UNA prediccion ya calculada por el modelo de clasificacion en una
@@ -11,12 +13,12 @@ from __future__ import annotations
 import json
 import logging
 
-import anthropic
+import openai
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.assistant.tools import CHART_TOOL_NAME, TOOLS, execute_data_tool
-from app.config import ANTHROPIC_API_KEY, CLAUDE_MODEL
+from app.config import OPENAI_API_KEY, OPENAI_MODEL
 from app.models import RiskAlert
 
 logger = logging.getLogger("eduapp.assistant")
@@ -52,84 +54,92 @@ class AssistantError(Exception):
     """Error legible para mostrar en el chat (clave faltante, rate limit, etc.)."""
 
 
-def _client() -> anthropic.Anthropic:
-    if not ANTHROPIC_API_KEY:
+def _client() -> openai.OpenAI:
+    if not OPENAI_API_KEY:
         raise AssistantError(
-            "El asistente no esta configurado: falta ANTHROPIC_API_KEY en backend/.env "
+            "El asistente no esta configurado: falta OPENAI_API_KEY en backend/.env "
             "(agrega tu clave y reinicia el contenedor del backend)."
         )
-    return anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
+    return openai.OpenAI(api_key=OPENAI_API_KEY)
 
 
-def _create(client: anthropic.Anthropic, **kwargs):
-    """client.messages.create con el mismo mapeo de errores en los dos flujos
-    (chat y explicar_prediccion)."""
+def _create(client: openai.OpenAI, **kwargs):
+    """client.responses.create con el mismo mapeo de errores en los dos
+    flujos (chat y explicar_prediccion)."""
     try:
-        return client.messages.create(**kwargs)
-    except anthropic.AuthenticationError as err:
-        raise AssistantError("La clave de Anthropic no es valida. Revisa ANTHROPIC_API_KEY en backend/.env.") from err
-    except anthropic.RateLimitError as err:
-        raise AssistantError("Se alcanzo el limite de uso de la API de Claude. Intenta de nuevo en un momento.") from err
-    except anthropic.APIStatusError as err:
-        logger.exception("Error de la API de Anthropic")
+        return client.responses.create(**kwargs)
+    except openai.AuthenticationError as err:
+        raise AssistantError("La clave de OpenAI no es valida. Revisa OPENAI_API_KEY en backend/.env.") from err
+    except openai.RateLimitError as err:
+        raise AssistantError("Se alcanzo el limite de uso de la API de OpenAI. Intenta de nuevo en un momento.") from err
+    except openai.APIStatusError as err:
+        logger.exception("Error de la API de OpenAI")
         raise AssistantError(f"El asistente no pudo responder ({err.status_code}).") from err
-    except anthropic.APIConnectionError as err:
-        raise AssistantError("No se pudo conectar con la API de Claude. Revisa la conexion a internet.") from err
+    except openai.APIConnectionError as err:
+        raise AssistantError("No se pudo conectar con la API de OpenAI. Revisa la conexion a internet.") from err
+
+
+def _tools_openai() -> list[dict]:
+    return [
+        {
+            "type": "function",
+            "name": t["name"],
+            "description": t["description"],
+            "parameters": t["input_schema"],
+        }
+        for t in TOOLS
+    ]
 
 
 def chat(db: Session, message: str, history: list[dict] | None = None) -> dict:
     """Devuelve {'reply': str, 'chart': dict | None}."""
     client = _client()
 
-    messages: list[dict] = []
+    input_items: list = []
     for turn in (history or [])[-MAX_HISTORY_MESSAGES:]:
         role = turn.get("role")
         content = turn.get("content")
         if role in ("user", "assistant") and content:
-            messages.append({"role": role, "content": content})
-    messages.append({"role": "user", "content": message})
+            input_items.append({"role": role, "content": content})
+    input_items.append({"role": "user", "content": message})
 
     chart: dict | None = None
 
     for _ in range(MAX_TOOL_ITERATIONS):
         response = _create(
             client,
-            model=CLAUDE_MODEL,
-            max_tokens=2048,
-            system=SYSTEM_PROMPT,
-            tools=TOOLS,
-            messages=messages,
+            model=OPENAI_MODEL,
+            instructions=SYSTEM_PROMPT,
+            input=input_items,
+            tools=_tools_openai(),
         )
 
-        if response.stop_reason == "refusal":
-            return {"reply": "No puedo ayudar con esa solicitud.", "chart": None}
+        function_calls = [item for item in response.output if item.type == "function_call"]
 
-        if response.stop_reason != "tool_use":
-            reply_text = "".join(b.text for b in response.content if b.type == "text").strip()
-            return {"reply": reply_text or "No tengo una respuesta para eso.", "chart": chart}
+        if not function_calls:
+            texto = (response.output_text or "").strip()
+            return {"reply": texto or "No tengo una respuesta para eso.", "chart": chart}
 
-        messages.append({"role": "assistant", "content": response.content})
+        input_items += response.output
 
-        tool_results = []
-        for block in response.content:
-            if block.type != "tool_use":
-                continue
-            if block.name == CHART_TOOL_NAME:
-                chart = block.input
+        for call in function_calls:
+            name = call.name
+            try:
+                tool_input = json.loads(call.arguments or "{}")
+            except json.JSONDecodeError:
+                tool_input = {}
+
+            if name == CHART_TOOL_NAME:
+                chart = tool_input
                 result_content = "Grafica generada y mostrada al usuario en el dashboard."
             else:
                 try:
-                    result_content = execute_data_tool(block.name, block.input, db)
-                except Exception as err:  # noqa: BLE001 - se lo devolvemos a Claude como error de tool
-                    logger.exception("Fallo ejecutando la tool %s", block.name)
-                    tool_results.append({
-                        "type": "tool_result", "tool_use_id": block.id,
-                        "content": f"Error ejecutando {block.name}: {err}", "is_error": True,
-                    })
-                    continue
-            tool_results.append({"type": "tool_result", "tool_use_id": block.id, "content": result_content})
+                    result_content = execute_data_tool(name, tool_input, db)
+                except Exception as err:  # noqa: BLE001 - se lo devolvemos al modelo como error de tool
+                    logger.exception("Fallo ejecutando la tool %s", name)
+                    result_content = f"Error ejecutando {name}: {err}"
 
-        messages.append({"role": "user", "content": tool_results})
+            input_items.append({"type": "function_call_output", "call_id": call.call_id, "output": result_content})
 
     return {
         "reply": "No pude terminar de consultar los datos para responder eso. "
@@ -158,8 +168,8 @@ orientacion en las proximas semanas.
 
 def explicar_prediccion(db: Session, anio: str, cod_estudiante: int, materia: str) -> dict:
     """Devuelve {'descripcion': str, 'recomendaciones': list[str]} para UNA
-    prediccion ya calculada (una fila de risk_alerts), generadas por Claude a
-    partir de los datos reales de esa fila — no de todo el dataset."""
+    prediccion ya calculada (una fila de risk_alerts), generadas por el modelo
+    a partir de los datos reales de esa fila — no de todo el dataset."""
     alerta = db.execute(
         select(RiskAlert).where(
             RiskAlert.anio == anio,
@@ -186,13 +196,18 @@ def explicar_prediccion(db: Session, anio: str, cod_estudiante: int, materia: st
     client = _client()
     response = _create(
         client,
-        model=CLAUDE_MODEL,
-        max_tokens=1200,
-        system=EXPLICACION_SYSTEM_PROMPT,
-        output_config={
-            "effort": "medium",
+        model=OPENAI_MODEL,
+        instructions=EXPLICACION_SYSTEM_PROMPT,
+        input=[{
+            "role": "user",
+            "content": "Estos son los datos reales de la prediccion (no inventes otros):\n"
+                       + json.dumps(contexto, ensure_ascii=False, indent=2),
+        }],
+        text={
             "format": {
                 "type": "json_schema",
+                "name": "explicacion_prediccion",
+                "strict": True,
                 "schema": {
                     "type": "object",
                     "properties": {
@@ -204,12 +219,6 @@ def explicar_prediccion(db: Session, anio: str, cod_estudiante: int, materia: st
                 },
             },
         },
-        messages=[{
-            "role": "user",
-            "content": "Estos son los datos reales de la prediccion (no inventes otros):\n"
-                       + json.dumps(contexto, ensure_ascii=False, indent=2),
-        }],
     )
 
-    texto = next(b.text for b in response.content if b.type == "text")
-    return json.loads(texto)
+    return json.loads(response.output_text)

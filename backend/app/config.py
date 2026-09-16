@@ -29,8 +29,8 @@ CORS_ORIGINS = os.getenv("CORS_ORIGINS", "http://localhost:3000").split(",")
 # Si es True, (re)carga el CSV completo al arrancar aunque ya existan datos.
 FORCE_RESEED = os.getenv("FORCE_RESEED", "false").lower() in {"1", "true", "yes"}
 
-# Asistente conversacional (Claude). La API key se lee del entorno y nunca se
+# Asistente conversacional (OpenAI). La API key se lee del entorno y nunca se
 # expone al frontend: el navegador solo habla con este backend, y este backend
-# es el unico que llama a la API de Anthropic. Ver backend/.env.
-ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
-CLAUDE_MODEL = os.getenv("CLAUDE_MODEL", "claude-opus-5")
+# es el unico que llama a la API de OpenAI. Ver backend/.env.
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
+OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-5.6-luna")

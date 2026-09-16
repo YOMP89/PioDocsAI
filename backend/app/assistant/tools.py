@@ -1,4 +1,4 @@
-"""Herramientas que Claude puede llamar para responder preguntas sobre datos
+"""Herramientas que el asistente (OpenAI) puede llamar para responder preguntas sobre datos
 reales (nunca inventados) y para pedir que el dashboard dibuje una grafica.
 Las tres primeras solo leen de la base de datos, reusando exactamente las
 mismas funciones que usan los endpoints del dashboard (app/services.py) para
