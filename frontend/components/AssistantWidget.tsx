@@ -23,9 +23,9 @@ import { api, type ChartSpec, type ChatTurn } from '@/lib/api'
 
 type Mensaje = ChatTurn & { chart?: ChartSpec | null; error?: boolean }
 
-// Burg Cinoleo, Granate, Pacquirismo (marca) + verde/morado/teal auxiliares
-// para series adicionales que la paleta de marca no cubre.
-const COLORES = ['#1337A2', '#8B1A2B', '#C9A227', '#10b981', '#8b5cf6', '#06b6d4']
+// Paleta academica vivida (azul institucional, coral, amarillo dorado) +
+// esmeralda/violeta/turquesa auxiliares para series adicionales.
+const COLORES = ['#1670FF', '#FB5072', '#FFBC2B', '#10b981', '#8b5cf6', '#14b8a6']
 
 function chartAFilas(chart: ChartSpec) {
   return chart.etiquetas.map((etiqueta, i) => {
