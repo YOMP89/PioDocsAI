@@ -8,6 +8,7 @@ import {
   ArrowUpRight,
   BookOpen,
   BrainCircuit,
+  Check,
   ChevronDown,
   ChevronRight,
   CircleHelp,
@@ -18,6 +19,7 @@ import {
   Gauge,
   LayoutDashboard,
   Loader2,
+  LogOut,
   Menu,
   MoreHorizontal,
   PanelLeftClose,
@@ -437,12 +439,131 @@ function ModeloMLView() {
   </div>
 }
 
+const VARIABLES_MODELO: { nombre: string; explicacion: string }[] = [
+  { nombre: 'valor_p1, valor_p2, valor_p3', explicacion: 'La nota del estudiante en esa materia durante los periodos 1, 2 y 3.' },
+  { nombre: 'promedio_propio', explicacion: 'El promedio del propio estudiante en esa materia, calculado sobre los periodos 1 a 3.' },
+  { nombre: 'minimo_propio', explicacion: 'La nota más baja que ha sacado el estudiante en esa materia durante los periodos 1 a 3.' },
+  { nombre: 'tendencia', explicacion: 'La diferencia entre la nota del periodo 3 y la del periodo 1: si es negativa, las notas vienen cayendo; si es positiva, vienen mejorando.' },
+  { nombre: 'veces_no_aprobado', explicacion: 'Cuántos de los tres periodos ya evaluados el estudiante perdió esa materia.' },
+  { nombre: 'promedio_otras_materias', explicacion: 'El promedio del estudiante en el resto de sus materias, para distinguir una dificultad puntual de una dificultad generalizada.' },
+  { nombre: 'sexo, curso', explicacion: 'Datos de contexto del estudiante (curso y sexo) que el modelo tiene en cuenta junto con las notas.' },
+]
+
+function HelpCenterModal({ onClose }: { onClose: () => void }) {
+  return <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-900/40 p-4 py-10 backdrop-blur-sm" onClick={onClose}>
+    <div onClick={(e) => e.stopPropagation()} className="w-full max-w-2xl overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl">
+      <div className="flex items-center gap-3 bg-linear-to-r from-blue-600 to-blue-800 px-6 py-5 text-white">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/20"><CircleHelp size={20} /></div>
+        <div className="flex-1">
+          <p className="text-lg font-bold leading-tight">Centro de ayuda</p>
+          <p className="text-sm leading-tight text-blue-100">Cómo funciona el modelo de riesgo académico</p>
+        </div>
+        <button onClick={onClose} aria-label="Cerrar" className="rounded-lg p-1.5 transition hover:bg-white/20"><X size={18} /></button>
+      </div>
+
+      <div className="max-h-[70vh] space-y-6 overflow-y-auto p-6">
+        <section>
+          <h3 className="flex items-center gap-2 font-bold text-slate-900"><div className="flex h-7 w-7 items-center justify-center rounded-full bg-linear-to-br from-violet-400 to-violet-600 text-white"><BrainCircuit size={14} /></div>¿Qué hace el modelo?</h3>
+          <p className="mt-2 text-sm leading-6 text-slate-600">PioDocsAI usa un <strong>bosque aleatorio</strong> (random forest) entrenado con el histórico académico 2020-2025 del colegio. Para cada combinación estudiante-materia, con las notas de los periodos 1 a 3 ya conocidas, el modelo estima la probabilidad de que el estudiante pierda esa materia en el periodo 4. El modelo únicamente señala los casos a revisar: la decisión de cómo acompañar a cada estudiante siempre queda en manos del docente o del equipo de acompañamiento.</p>
+        </section>
+
+        <section>
+          <h3 className="flex items-center gap-2 font-bold text-slate-900"><div className="flex h-7 w-7 items-center justify-center rounded-full bg-linear-to-br from-blue-400 to-blue-600 text-white"><Gauge size={14} /></div>Las métricas de la sección "Modelo ML"</h3>
+          <div className="mt-2 space-y-2 text-sm leading-6 text-slate-600">
+            <p><strong className="text-slate-900">AUC (prueba):</strong> mide qué tan bien ordena el modelo a los estudiantes en riesgo frente a los que no lo están, sobre datos que no usó para entrenar. Va de 0 a 1; mientras más cerca de 1, mejor distingue el modelo los casos de riesgo.</p>
+            <p><strong className="text-slate-900">Umbral de alerta:</strong> la probabilidad mínima a partir de la cual una combinación estudiante-materia se marca como alerta. Se fijó deliberadamente bajo, porque pasar por alto a un estudiante en riesgo (falso negativo) es más costoso que generar una alerta de más (falso positivo).</p>
+            <p><strong className="text-slate-900">Filas de entrenamiento:</strong> el número de combinaciones estudiante-materia que el modelo usó para aprender.</p>
+            <p><strong className="text-slate-900">Entrenado / periodo de corte:</strong> la fecha del último entrenamiento y el periodo (3) hasta el cual se toman las notas como información de entrada, dejando el periodo 4 como lo que se quiere predecir.</p>
+          </div>
+        </section>
+
+        <section>
+          <h3 className="flex items-center gap-2 font-bold text-slate-900"><div className="flex h-7 w-7 items-center justify-center rounded-full bg-linear-to-br from-amber-400 to-amber-600 text-white"><Database size={14} /></div>Importancia de variables y variables del modelo</h3>
+          <p className="mt-2 text-sm leading-6 text-slate-600">El gráfico de "Importancia de variables" muestra cuánto pesa cada dato en las predicciones (impureza Gini): mientras más larga la barra, más influye esa variable en el resultado. Estas son las variables que usa el modelo:</p>
+          <div className="mt-3 space-y-2">
+            {VARIABLES_MODELO.map((v) => <div key={v.nombre} className="rounded-xl border border-slate-100 bg-slate-50/60 px-3 py-2">
+              <p className="font-mono text-xs font-bold text-blue-700">{v.nombre}</p>
+              <p className="mt-0.5 text-xs leading-5 text-slate-600">{v.explicacion}</p>
+            </div>)}
+          </div>
+        </section>
+
+        <section className="flex items-start gap-2 rounded-xl bg-blue-50 px-4 py-3 text-xs leading-5 text-blue-800">
+          <ShieldCheck size={16} className="mt-0.5 shrink-0 text-blue-600" />
+          Las predicciones son probabilísticas y se basan en datos históricos: son un apoyo para priorizar el acompañamiento, no un diagnóstico definitivo.
+        </section>
+      </div>
+    </div>
+  </div>
+}
+
+type Cuenta = { nombre: string; rol: string; foto: string }
+const CUENTAS_DISPONIBLES: Cuenta[] = [
+  { nombre: 'Administrador', rol: 'Cuenta institucional', foto: '/administrador.png' },
+  { nombre: 'Coordinación académica', rol: 'Seguimiento por curso', foto: '/mujer_profesional.jpg' },
+  { nombre: 'Orientación escolar', rol: 'Acompañamiento psicosocial', foto: '/hombre_profesional.jpg' },
+]
+
+function ConfigModal({ cuentaActual, onCambiarCuenta, onClose }: { cuentaActual: Cuenta; onCambiarCuenta: (c: Cuenta) => void; onClose: () => void }) {
+  const [sesionCerrada, setSesionCerrada] = useState(false)
+
+  return <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-900/40 p-4 py-10 backdrop-blur-sm" onClick={onClose}>
+    <div onClick={(e) => e.stopPropagation()} className="w-full max-w-md overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl">
+      <div className="flex items-center gap-3 bg-linear-to-r from-blue-600 to-blue-800 px-6 py-5 text-white">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/20"><Settings size={20} /></div>
+        <div className="flex-1">
+          <p className="text-lg font-bold leading-tight">Configuración</p>
+          <p className="text-sm leading-tight text-blue-100">Cuenta y sesión</p>
+        </div>
+        <button onClick={onClose} aria-label="Cerrar" className="rounded-lg p-1.5 transition hover:bg-white/20"><X size={18} /></button>
+      </div>
+
+      {sesionCerrada ? (
+        <div className="flex flex-col items-center gap-3 p-8 text-center">
+          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-linear-to-br from-rose-400 to-rose-600 text-white shadow-sm shadow-rose-500/18"><LogOut size={22} /></div>
+          <p className="font-bold text-slate-900">Sesión cerrada</p>
+          <p className="text-sm leading-6 text-slate-500">Esta es una demostración: no hay un sistema de autenticación conectado todavía.</p>
+          <button onClick={() => { setSesionCerrada(false); onClose() }} className="mt-2 rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-700">Volver a iniciar sesión</button>
+        </div>
+      ) : (
+        <div className="space-y-6 p-6">
+          <section>
+            <h3 className="flex items-center gap-2 font-bold text-slate-900"><div className="flex h-7 w-7 items-center justify-center rounded-full bg-linear-to-br from-violet-400 to-violet-600 text-white"><Users size={14} /></div>Cambiar de cuenta</h3>
+            <p className="mt-1 text-xs text-slate-400">Vista de demostración: aún no está conectada a un sistema de usuarios real.</p>
+            <div className="mt-3 space-y-2">
+              {CUENTAS_DISPONIBLES.map((c) => {
+                const activa = c.nombre === cuentaActual.nombre
+                return <button key={c.nombre} onClick={() => onCambiarCuenta(c)} className={`flex w-full items-center gap-3 rounded-xl border px-3 py-2.5 text-left transition ${activa ? 'border-blue-200 bg-blue-50' : 'border-slate-100 bg-slate-50/60 hover:border-blue-100 hover:bg-blue-50/60'}`}>
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full ring-1 ring-blue-100"><img src={c.foto} alt={c.nombre} className="h-full w-full object-cover" /></div>
+                  <div className="min-w-0 flex-1">
+                    <p className={`truncate text-sm font-semibold ${activa ? 'text-blue-700' : 'text-slate-700'}`}>{c.nombre}</p>
+                    <p className="truncate text-xs text-slate-400">{c.rol}</p>
+                  </div>
+                  {activa && <Check size={16} className="shrink-0 text-blue-600" />}
+                </button>
+              })}
+            </div>
+          </section>
+
+          <section>
+            <h3 className="flex items-center gap-2 font-bold text-slate-900"><div className="flex h-7 w-7 items-center justify-center rounded-full bg-linear-to-br from-rose-400 to-rose-600 text-white"><LogOut size={14} /></div>Sesión</h3>
+            <button onClick={() => setSesionCerrada(true)} className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2.5 text-sm font-semibold text-rose-700 transition hover:bg-rose-100"><LogOut size={15} />Cerrar sesión</button>
+          </section>
+        </div>
+      )}
+    </div>
+  </div>
+}
+
 export default function Page() {
   const [activeNav, setActiveNav] = useState('Resumen general')
   const [selectedStudent, setSelectedStudent] = useState<SeleccionEstudiante | null>(null)
   const [mobileOpen, setMobileOpen] = useState(false)
   const [search, setSearch] = useState('')
   const [profileOpen, setProfileOpen] = useState(false)
+  const [helpOpen, setHelpOpen] = useState(false)
+  const [configOpen, setConfigOpen] = useState(false)
+  const [cuenta, setCuenta] = useState(CUENTAS_DISPONIBLES[0])
   const currentTitle = activeNav === 'Resumen general' ? 'Panel de acompañamiento' : activeNav
   const content = selectedStudent
     ? <StudentDetail seleccion={selectedStudent} onBack={() => setSelectedStudent(null)} />
@@ -451,18 +572,18 @@ export default function Page() {
     : activeNav === 'Materias' ? <MateriasView />
     : activeNav === 'Importar datos' ? <DataImport />
     : <ModeloMLView />
-  return <div className="min-h-screen bg-[#F3F8FF] text-slate-900"><aside className={`fixed inset-y-0 left-0 z-30 flex w-64 flex-col bg-linear-to-b from-blue-800 via-blue-700 to-blue-500 shadow-xl transition-transform lg:translate-x-0 ${mobileOpen ? 'translate-x-0' : '-translate-x-full'}`}><div className="flex h-20 items-center justify-between border-b border-white/10 px-5"><div className="flex items-center gap-3"><div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-white p-1 shadow-md ring-2 ring-white/80"><img src="/escudo-pio-xii.png" alt="Escudo Colegio Franciscano Pío XII" className="h-full w-full object-contain" /></div><div><p className="text-[17px] font-bold tracking-tight text-white">PioDocs<span className="text-amber-300">AI</span></p><p className="text-[12px] font-medium uppercase tracking-wider text-blue-200/80">Acompañamiento académico</p></div></div><button onClick={() => setMobileOpen(false)} className="rounded-lg p-1 text-blue-200/80 lg:hidden"><X size={18} /></button></div><nav className="flex flex-1 flex-col gap-1 px-3 py-6"><p className="mb-2 px-3 text-[12px] font-bold uppercase tracking-widest text-blue-200/70">Navegación principal</p>{navItems.map(({ label, icon: Icon }) => <button key={label} onClick={() => { setActiveNav(label); setSelectedStudent(null); setMobileOpen(false) }} className={`group flex items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-medium transition ${activeNav === label ? 'bg-white text-blue-700 shadow-md shadow-blue-900/20' : 'text-blue-100 hover:bg-white/10 hover:text-white'}`}><Icon size={18} className={activeNav === label ? 'text-blue-600' : 'text-blue-300 group-hover:text-white'} />{label}</button>)}<div className="my-5 border-t border-white/10" /><p className="mb-2 px-3 text-[12px] font-bold uppercase tracking-widest text-blue-200/70">Sistema</p><button className="group flex items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-medium text-blue-100 hover:bg-white/10 hover:text-white"><Settings size={18} className="text-blue-300" />Configuración</button><button className="group flex items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-medium text-blue-100 hover:bg-white/10 hover:text-white"><CircleHelp size={18} className="text-blue-300" />Centro de ayuda</button></nav></aside><div className="lg:pl-64"><header className="sticky top-0 z-20 flex h-20 items-center justify-between border-b border-slate-200 bg-white/90 px-4 backdrop-blur md:px-8"><div className="flex items-center gap-3"><button onClick={() => setMobileOpen(true)} className="rounded-lg p-2 text-slate-500 transition hover:bg-blue-50 hover:text-blue-600 lg:hidden"><Menu size={20} /></button><div><p className="text-xs text-slate-400">Colegio Franciscano Pío XII</p><h2 className="mt-0.5 text-base font-bold text-slate-900">{currentTitle}</h2></div></div><div className="flex items-center gap-2"><div className="relative hidden md:block"><Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" /><input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar estudiante..." className="w-56 rounded-xl border border-slate-200 bg-slate-50 py-2.5 pl-9 pr-3 text-sm outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-500/15" /></div><div className="ml-1 hidden h-8 w-px bg-slate-200 sm:block" /><div className="relative hidden sm:block"><button onClick={() => setProfileOpen((v) => !v)} className="flex items-center gap-2 rounded-xl px-2 py-1.5 transition hover:bg-blue-50"><div className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full shadow-sm shadow-blue-600/18 ring-1 ring-blue-100"><img src="/administrador.png" alt="Administrador" className="h-full w-full object-cover" /></div><ChevronDown size={15} className={`text-slate-400 transition-transform ${profileOpen ? 'rotate-180' : ''}`} /></button>{profileOpen && <>
+  return <div className="min-h-screen bg-[#F3F8FF] text-slate-900"><aside className={`fixed inset-y-0 left-0 z-30 flex w-64 flex-col bg-linear-to-b from-blue-800 via-blue-700 to-blue-500 shadow-xl transition-transform lg:translate-x-0 ${mobileOpen ? 'translate-x-0' : '-translate-x-full'}`}><div className="flex h-20 items-center justify-between border-b border-white/10 px-5"><div className="flex items-center gap-3"><div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-white p-1 shadow-md ring-2 ring-white/80"><img src="/escudo-pio-xii.png" alt="Escudo Colegio Franciscano Pío XII" className="h-full w-full object-contain" /></div><div><p className="text-[17px] font-bold tracking-tight text-white">PioDocs<span className="text-amber-300">AI</span></p><p className="text-[12px] font-medium uppercase tracking-wider text-blue-200/80">Acompañamiento académico</p></div></div><button onClick={() => setMobileOpen(false)} className="rounded-lg p-1 text-blue-200/80 lg:hidden"><X size={18} /></button></div><nav className="flex flex-1 flex-col gap-1 px-3 py-6"><p className="mb-2 px-3 text-[12px] font-bold uppercase tracking-widest text-blue-200/70">Navegación principal</p>{navItems.map(({ label, icon: Icon }) => <button key={label} onClick={() => { setActiveNav(label); setSelectedStudent(null); setMobileOpen(false) }} className={`group flex items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-medium transition ${activeNav === label ? 'bg-white text-blue-700 shadow-md shadow-blue-900/20' : 'text-blue-100 hover:bg-white/10 hover:text-white'}`}><Icon size={18} className={activeNav === label ? 'text-blue-600' : 'text-blue-300 group-hover:text-white'} />{label}</button>)}<div className="my-5 border-t border-white/10" /><p className="mb-2 px-3 text-[12px] font-bold uppercase tracking-widest text-blue-200/70">Sistema</p><button onClick={() => setConfigOpen(true)} className="group flex items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-medium text-blue-100 hover:bg-white/10 hover:text-white"><Settings size={18} className="text-blue-300" />Configuración</button><button onClick={() => setHelpOpen(true)} className="group flex items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-medium text-blue-100 hover:bg-white/10 hover:text-white"><CircleHelp size={18} className="text-blue-300" />Centro de ayuda</button></nav></aside><div className="lg:pl-64"><header className="sticky top-0 z-20 flex h-20 items-center justify-between border-b border-slate-200 bg-white/90 px-4 backdrop-blur md:px-8"><div className="flex items-center gap-3"><button onClick={() => setMobileOpen(true)} className="rounded-lg p-2 text-slate-500 transition hover:bg-blue-50 hover:text-blue-600 lg:hidden"><Menu size={20} /></button><div><p className="text-xs text-slate-400">Colegio Franciscano Pío XII</p><h2 className="mt-0.5 text-base font-bold text-slate-900">{currentTitle}</h2></div></div><div className="flex items-center gap-2"><div className="relative hidden md:block"><Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" /><input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar estudiante..." className="w-56 rounded-xl border border-slate-200 bg-slate-50 py-2.5 pl-9 pr-3 text-sm outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-500/15" /></div><div className="ml-1 hidden h-8 w-px bg-slate-200 sm:block" /><div className="relative hidden sm:block"><button onClick={() => setProfileOpen((v) => !v)} className="flex items-center gap-2 rounded-xl px-2 py-1.5 transition hover:bg-blue-50"><div className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full shadow-sm shadow-blue-600/18 ring-1 ring-blue-100"><img src="/administrador.png" alt="Administrador" className="h-full w-full object-cover" /></div><ChevronDown size={15} className={`text-slate-400 transition-transform ${profileOpen ? 'rotate-180' : ''}`} /></button>{profileOpen && <>
                 <div className="fixed inset-0 z-30" onClick={() => setProfileOpen(false)} />
                 <div className="absolute right-0 top-full z-40 mt-2 w-48 overflow-hidden rounded-xl border border-slate-200 bg-white py-1.5 shadow-lg shadow-blue-900/10">
                   <div className="flex items-center gap-2.5 border-b border-slate-100 px-3 py-2.5">
                     <div className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full ring-1 ring-blue-100"><img src="/administrador.png" alt="Administrador" className="h-full w-full object-cover" /></div>
                     <div>
-                      <p className="text-sm font-bold leading-tight text-slate-900">Administrador</p>
-                      <p className="text-xs leading-tight text-slate-400">Cuenta institucional</p>
+                      <p className="text-sm font-bold leading-tight text-slate-900">{cuenta.nombre}</p>
+                      <p className="text-xs leading-tight text-slate-400">{cuenta.rol}</p>
                     </div>
                   </div>
-                  <button className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-slate-600 transition hover:bg-blue-50 hover:text-blue-600"><Settings size={15} className="text-slate-400" />Configuración</button>
-                  <button className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-slate-600 transition hover:bg-blue-50 hover:text-blue-600"><CircleHelp size={15} className="text-slate-400" />Centro de ayuda</button>
+                  <button onClick={() => { setConfigOpen(true); setProfileOpen(false) }} className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-slate-600 transition hover:bg-blue-50 hover:text-blue-600"><Settings size={15} className="text-slate-400" />Configuración</button>
+                  <button onClick={() => { setHelpOpen(true); setProfileOpen(false) }} className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-slate-600 transition hover:bg-blue-50 hover:text-blue-600"><CircleHelp size={15} className="text-slate-400" />Centro de ayuda</button>
                 </div>
-              </>}</div></div></header><main className="p-4 md:p-8">{content}<div className="mt-8 flex items-center gap-2 border-t border-slate-200 pt-5 text-xs leading-5 text-slate-400"><ShieldCheck size={14} className="shrink-0 text-blue-500" />Las predicciones son probabilísticas y no sustituyen el criterio profesional ni la conversación con cada estudiante.</div></main></div></div>
+              </>}</div></div></header><main className="p-4 md:p-8">{content}<div className="mt-8 flex items-center gap-2 border-t border-slate-200 pt-5 text-xs leading-5 text-slate-400"><ShieldCheck size={14} className="shrink-0 text-blue-500" />Las predicciones son probabilísticas y no sustituyen el criterio profesional ni la conversación con cada estudiante.</div></main></div>{helpOpen && <HelpCenterModal onClose={() => setHelpOpen(false)} />}{configOpen && <ConfigModal cuentaActual={cuenta} onCambiarCuenta={setCuenta} onClose={() => setConfigOpen(false)} />}</div>
 }
