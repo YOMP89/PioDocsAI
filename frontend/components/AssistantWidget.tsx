@@ -141,7 +141,7 @@ export function AssistantWidget() {
     <>
       {abierto && (
         <div className="fixed bottom-24 right-6 z-40 flex h-[32rem] w-[23rem] max-w-[calc(100vw-3rem)] flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl">
-          <div className="flex items-center gap-2 border-b border-slate-100 bg-linear-to-r from-violet-600 to-blue-700 px-4 py-3 text-white">
+          <div className="flex items-center gap-2 border-b border-slate-100 bg-linear-to-r from-blue-600 to-blue-800 px-4 py-3 text-white">
             <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/20"><BookOpen size={16} /></div>
             <div className="flex-1">
               <p className="text-sm font-bold leading-tight">Pío Docs</p>
@@ -187,7 +187,7 @@ export function AssistantWidget() {
               type="submit"
               disabled={enviando || !entrada.trim()}
               aria-label="Enviar"
-              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-linear-to-br from-violet-500 to-blue-600 text-white shadow-sm shadow-violet-600/18 transition hover:from-violet-600 hover:to-blue-700 active:from-violet-700 active:to-blue-800 disabled:opacity-40"
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-linear-to-br from-blue-500 to-blue-700 text-white shadow-sm shadow-blue-600/18 transition hover:from-blue-600 hover:to-blue-800 active:from-blue-700 active:to-blue-900 disabled:opacity-40"
             >
               <Send size={16} />
             </button>
@@ -198,7 +198,7 @@ export function AssistantWidget() {
       <button
         onClick={() => setAbierto((v) => !v)}
         aria-label={abierto ? 'Cerrar Pío Docs' : 'Abrir Pío Docs'}
-        className={`fixed bottom-6 right-6 z-40 flex h-14 w-14 items-center justify-center overflow-hidden rounded-full bg-white shadow-lg ring-4 ring-white transition hover:scale-105 hover:shadow-violet-600/18 hover:ring-violet-100 ${abierto ? '' : 'animate-bot-bounce'}`}
+        className={`fixed bottom-6 right-6 z-40 flex h-14 w-14 items-center justify-center overflow-hidden rounded-full bg-white shadow-lg ring-4 ring-white transition hover:scale-105 hover:shadow-blue-600/18 hover:ring-blue-100 ${abierto ? '' : 'animate-bot-bounce'}`}
       >
         {abierto ? (
           <X size={22} className="text-slate-700" />

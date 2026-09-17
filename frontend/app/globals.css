@@ -178,7 +178,7 @@ body { @apply bg-background text-foreground font-sans; }
    (las utilidades si lo estan, y lo "sin capa" siempre gana en la cascada). */
 button, input, select { font-family: inherit; }
 button { cursor: pointer; }
-h1, h2 { font-family: var(--font-playfair), 'Playfair Display', serif; }
+h1, h2 { font-family: var(--font-heading), 'Plus Jakarta Sans', sans-serif; letter-spacing: -0.01em; }
 
 /* Rebote suave del boton flotante del asistente: llama la atencion sin ser
    ruidoso. Se pausa en hover para no pelear con el scale del :hover. */

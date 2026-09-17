@@ -1,13 +1,16 @@
 import { Analytics } from '@vercel/analytics/next'
 import type { Metadata, Viewport } from 'next'
-import { Nunito, Playfair_Display } from 'next/font/google'
+import { Nunito, Plus_Jakarta_Sans } from 'next/font/google'
 import { AssistantWidget } from '@/components/AssistantWidget'
 import './globals.css'
 
 // Tipografías de la guía de marca del Colegio Franciscano de Pío XII:
-// Playfair Display para títulos (H1/H2), Nunito para el resto de la interfaz.
+// Plus Jakarta Sans para títulos y subtítulos (H1/H2) — geométrica, redondeada
+// y moderna, alineada con la referencia visual de modelo.png (en vez de la
+// serif Playfair Display, que desentonaba con esa estética). Nunito se
+// mantiene para el resto de la interfaz.
 const nunito = Nunito({ subsets: ['latin'], variable: '--font-nunito' })
-const playfair = Playfair_Display({ subsets: ['latin'], variable: '--font-playfair' })
+const plusJakarta = Plus_Jakarta_Sans({ subsets: ['latin'], weight: ['700', '800'], variable: '--font-heading' })
 
 export const metadata: Metadata = {
   title: 'PioDocsAI | Acompañamiento académico',
@@ -28,5 +31,5 @@ export const viewport: Viewport = {
 }
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  return <html lang="es" className="bg-background"><body className={`${nunito.variable} ${playfair.variable} antialiased`}>{children}<AssistantWidget />{process.env.NODE_ENV === 'production' && <Analytics />}</body></html>
+  return <html lang="es" className="bg-background"><body className={`${nunito.variable} ${plusJakarta.variable} antialiased`}>{children}<AssistantWidget />{process.env.NODE_ENV === 'production' && <Analytics />}</body></html>
 }
