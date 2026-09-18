@@ -197,6 +197,11 @@ class ExplicacionResponse(BaseModel):
     recomendaciones: list[str]
 
 
+class ExplicacionMateriaRequest(BaseModel):
+    materia: str
+    anio: str | None = None
+
+
 class ImportBatchOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

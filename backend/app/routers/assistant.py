@@ -1,9 +1,10 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
-from app.assistant.service import AssistantError, chat, explicar_prediccion
+from app.assistant.service import AssistantError, chat, explicar_materia, explicar_prediccion
 from app.database import get_db
-from app.schemas import ChatRequest, ChatResponse, ExplicacionRequest, ExplicacionResponse
+from app.schemas import (ChatRequest, ChatResponse, ExplicacionMateriaRequest,
+                          ExplicacionRequest, ExplicacionResponse)
 
 router = APIRouter(prefix="/api/assistant", tags=["assistant"])
 
@@ -21,6 +22,15 @@ def chat_endpoint(payload: ChatRequest, db: Session = Depends(get_db)):
 def explicar_endpoint(payload: ExplicacionRequest, db: Session = Depends(get_db)):
     try:
         resultado = explicar_prediccion(db, payload.anio, payload.cod_estudiante, payload.materia)
+    except AssistantError as err:
+        raise HTTPException(status_code=503, detail=str(err)) from err
+    return resultado
+
+
+@router.post("/explicar-materia", response_model=ExplicacionResponse)
+def explicar_materia_endpoint(payload: ExplicacionMateriaRequest, db: Session = Depends(get_db)):
+    try:
+        resultado = explicar_materia(db, payload.materia, payload.anio)
     except AssistantError as err:
         raise HTTPException(status_code=503, detail=str(err)) from err
     return resultado

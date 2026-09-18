@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { Fragment, useEffect, useMemo, useState } from 'react'
 import {
   Activity,
   AlertTriangle,
@@ -295,6 +295,10 @@ function MateriasView() {
   const [materias, setMaterias] = useState<MateriaResumen[] | null>(null)
   const [heatmap, setHeatmap] = useState<HeatmapMateriaGrado | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [abierta, setAbierta] = useState<string | null>(null)
+  const [estrategias, setEstrategias] = useState<Record<string, ExplicacionPrediccion>>({})
+  const [generando, setGenerando] = useState<string | null>(null)
+  const [errorEstrategia, setErrorEstrategia] = useState<Record<string, string>>({})
 
   useEffect(() => {
     let cancelado = false
@@ -306,6 +310,25 @@ function MateriasView() {
 
   if (error) return <ErrorPanel mensaje={error} />
   if (!materias) return <CargandoPanel label="Calculando el riesgo por materia…" />
+
+  async function alternarEstrategia(materia: string) {
+    if (abierta === materia) { setAbierta(null); return }
+    setAbierta(materia)
+    if (estrategias[materia] || generando === materia) return
+    setGenerando(materia)
+    setErrorEstrategia((prev) => {
+      if (!(materia in prev)) return prev
+      const copia = { ...prev }; delete copia[materia]; return copia
+    })
+    try {
+      const resultado = await api.explicarMateria(materia)
+      setEstrategias((prev) => ({ ...prev, [materia]: resultado }))
+    } catch (err) {
+      setErrorEstrategia((prev) => ({ ...prev, [materia]: err instanceof Error ? err.message : 'No se pudo generar la estrategia.' }))
+    } finally {
+      setGenerando(null)
+    }
+  }
 
   // El CSV trae el mismo nombre de materia bajo areas distintas entre años
   // (ej. "Inglés" vs "Idioma Extranjero: Inglés") — para el grafico se
@@ -385,7 +408,41 @@ function MateriasView() {
     </section>}
     <section className="rounded-2xl border border-slate-200 bg-white shadow-sm">
       <div className="border-b border-slate-100 p-5"><h2 className="font-bold text-slate-900">Todas las materias</h2><p className="mt-1 text-sm text-slate-500">{materias.length} materias evaluadas por el modelo.</p></div>
-      <div className="overflow-x-auto"><table className="w-full min-w-[600px] text-left text-sm"><thead className="bg-slate-50/70 text-xs uppercase tracking-wider text-slate-400"><tr><th className="px-5 py-3 font-semibold">Materia</th><th className="px-5 py-3 font-semibold">Área</th><th className="px-5 py-3 font-semibold">Riesgo</th><th className="px-5 py-3 font-semibold">En riesgo</th><th className="px-5 py-3 font-semibold">Evaluados</th></tr></thead><tbody className="divide-y divide-slate-100">{materias.map((m) => <tr key={`${m.materia}-${m.area}`} className="transition hover:bg-slate-50/60"><td className="px-5 py-3 font-medium text-slate-700">{m.materia}</td><td className="px-5 py-3 text-slate-500">{m.area}</td><td className="px-5 py-3 font-semibold text-slate-800">{m.risk_pct}%</td><td className="px-5 py-3 text-slate-600">{m.estudiantes_en_riesgo}</td><td className="px-5 py-3 text-slate-600">{m.estudiantes_evaluados}</td></tr>)}</tbody></table></div>
+      <div className="overflow-x-auto"><table className="w-full min-w-[700px] text-left text-sm"><thead className="bg-slate-50/70 text-xs uppercase tracking-wider text-slate-400"><tr><th className="px-5 py-3 font-semibold">Materia</th><th className="px-5 py-3 font-semibold">Área</th><th className="px-5 py-3 font-semibold">Riesgo</th><th className="px-5 py-3 font-semibold">En riesgo</th><th className="px-5 py-3 font-semibold">Evaluados</th><th className="px-5 py-3 font-semibold">Estrategia</th></tr></thead><tbody className="divide-y divide-slate-100">{materias.map((m) => {
+        const abiertaAqui = abierta === m.materia
+        const resultado = estrategias[m.materia]
+        const mensajeError = errorEstrategia[m.materia]
+        return <Fragment key={`${m.materia}-${m.area}`}>
+          <tr className="transition hover:bg-slate-50/60">
+            <td className="px-5 py-3 font-medium text-slate-700">{m.materia}</td>
+            <td className="px-5 py-3 text-slate-500">{m.area}</td>
+            <td className="px-5 py-3 font-semibold text-slate-800">{m.risk_pct}%</td>
+            <td className="px-5 py-3 text-slate-600">{m.estudiantes_en_riesgo}</td>
+            <td className="px-5 py-3 text-slate-600">{m.estudiantes_evaluados}</td>
+            <td className="px-5 py-3">
+              <button
+                onClick={() => alternarEstrategia(m.materia)}
+                disabled={generando === m.materia}
+                className="rounded-lg border border-blue-200 bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700 transition hover:bg-blue-100 disabled:opacity-60"
+              >
+                {generando === m.materia ? 'Generando…' : abiertaAqui ? 'Ocultar' : 'Generar estrategia'}
+              </button>
+            </td>
+          </tr>
+          {abiertaAqui && <tr className="bg-slate-50/50">
+            <td colSpan={6} className="px-5 py-4">
+              {mensajeError && <ErrorPanel mensaje={mensajeError} />}
+              {!mensajeError && !resultado && <p className="text-sm text-slate-400">Generando estrategia con IA a partir de los datos reales de esta materia…</p>}
+              {resultado && <div className="space-y-2">
+                <p className="text-sm leading-6 text-slate-700">{resultado.descripcion}</p>
+                <ul className="ml-4 list-disc space-y-1 text-sm text-slate-600">
+                  {resultado.recomendaciones.map((r, i) => <li key={i}>{r}</li>)}
+                </ul>
+              </div>}
+            </td>
+          </tr>}
+        </Fragment>
+      })}</tbody></table></div>
     </section>
   </div>
 }
@@ -481,6 +538,24 @@ function EstudiantesView({ onStudent }: { onStudent: (sel: SeleccionEstudiante) 
       </div>
       <p className="relative mt-2 text-xs text-slate-400">Barras concentradas en un tramo angosto y alto: el riesgo está localizado en un grupo pequeño (conviene un foco puntual). Barras repartidas a lo largo de todo el eje: conviene un seguimiento más amplio.</p>
     </section>}
+    <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+      <h2 className="font-bold text-slate-900">Guía general por nivel de riesgo</h2>
+      <p className="mt-1 text-sm text-slate-500">Orientación de referencia según el nivel calculado por el modelo. Para un caso puntual, usa el botón "Generar estrategia de apoyo" en la ficha del estudiante, que sí analiza sus datos concretos.</p>
+      <div className="mt-4 grid gap-3 sm:grid-cols-3">
+        <div className="rounded-xl border border-rose-200 bg-rose-50/60 p-4">
+          <p className="text-xs font-bold uppercase tracking-wide text-rose-700">Alto (&ge; {Math.round(umbralAlto * 100)}%)</p>
+          <p className="mt-2 text-sm leading-6 text-rose-900">Intervención individual en los próximos días: docente titular, orientación y familia. Ajustar un plan de apoyo específico a la materia y hacer seguimiento semanal hasta ver mejora sostenida.</p>
+        </div>
+        <div className="rounded-xl border border-amber-200 bg-amber-50/60 p-4">
+          <p className="text-xs font-bold uppercase tracking-wide text-amber-700">Medio ({Math.round(umbralMedio * 100)}%–{Math.round(umbralAlto * 100)}%)</p>
+          <p className="mt-2 text-sm leading-6 text-amber-900">Seguimiento monitoreado, sin alarma inmediata: registrar la tendencia periodo a periodo con el docente de la materia. Si no mejora en el próximo corte, escalar a intervención de riesgo Alto.</p>
+        </div>
+        <div className="rounded-xl border border-emerald-200 bg-emerald-50/60 p-4">
+          <p className="text-xs font-bold uppercase tracking-wide text-emerald-700">Bajo (&lt; {Math.round(umbralMedio * 100)}%)</p>
+          <p className="mt-2 text-sm leading-6 text-emerald-900">Sin acción adicional: mantener el seguimiento ordinario del curso. No requiere intervención especial del área de orientación.</p>
+        </div>
+      </div>
+    </section>
     <section className="relative overflow-hidden rounded-2xl border border-rose-100 bg-linear-to-br from-rose-50/40 via-white to-white p-5 shadow-sm">
       <div className="pointer-events-none absolute -right-12 -top-14 h-48 w-48 rounded-full bg-linear-to-br from-rose-300/25 to-amber-200/15 blur-3xl" />
       <h2 className="relative font-bold text-slate-900">Alertas por curso</h2>

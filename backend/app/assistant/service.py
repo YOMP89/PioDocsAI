@@ -20,6 +20,7 @@ from sqlalchemy.orm import Session
 from app.assistant.tools import CHART_TOOL_NAME, TOOLS, execute_data_tool
 from app.config import OPENAI_API_KEY, OPENAI_MODEL
 from app.models import RiskAlert
+from app.services import get_materia_detalle, obtener_tema_materia
 
 logger = logging.getLogger("eduapp.assistant")
 
@@ -163,6 +164,10 @@ que explican el nivel de riesgo, en 3-5 frases, tono profesional y empatico \
 una nota puntual baja, una tendencia a la baja, o que el resto de materias \
 tambien va mal), no genericas, y accionables por un docente o el area de \
 orientacion en las proximas semanas.
+- Si viene 'tema_del_curriculo' (el tema de la malla curricular para esta \
+materia y grado, a veces por periodo), usalo para que las recomendaciones \
+sean sobre el contenido concreto (ej. reforzar ese tema puntual) en vez de \
+genericas. Si no viene, no lo menciones ni inventes un tema.
 - Responde siempre en español."""
 
 
@@ -191,6 +196,7 @@ def explicar_prediccion(db: Session, anio: str, cod_estudiante: int, materia: st
         "periodos_ya_reprobados_en_esta_materia": alerta.veces_no_aprobado,
         "probabilidad_de_reprobar_estimada_por_el_modelo": round(alerta.probabilidad_riesgo * 100, 1),
         "nivel_de_riesgo": alerta.nivel_riesgo,
+        "tema_del_curriculo": obtener_tema_materia(alerta.materia, alerta.curso),
     }
 
     client = _client()
@@ -207,6 +213,73 @@ def explicar_prediccion(db: Session, anio: str, cod_estudiante: int, materia: st
             "format": {
                 "type": "json_schema",
                 "name": "explicacion_prediccion",
+                "strict": True,
+                "schema": {
+                    "type": "object",
+                    "properties": {
+                        "descripcion": {"type": "string"},
+                        "recomendaciones": {"type": "array", "items": {"type": "string"}, "minItems": 3, "maxItems": 5},
+                    },
+                    "required": ["descripcion", "recomendaciones"],
+                    "additionalProperties": False,
+                },
+            },
+        },
+    )
+
+    return json.loads(response.output_text)
+
+
+EXPLICACION_MATERIA_SYSTEM_PROMPT = """Eres Pío Docs, el asistente de PioDocsAI. Tu \
+tarea aqui es explicar el patron de riesgo de UNA MATERIA a nivel institucional \
+(agregando a todos los estudiantes evaluados en ella, no un solo caso), a partir \
+de datos reales que te da el sistema: el % de riesgo agregado y el desglose por \
+grado.
+
+Reglas:
+- Usa exclusivamente los numeros que se te dan; no inventes otras materias, \
+grados o cifras.
+- Compara los grados entre si: si el riesgo esta concentrado en 1-2 grados \
+(muy por encima del resto), dilo explicitamente y recomienda una estrategia \
+puntual en esos grados (ej. revisar al docente o la metodologia de ese grado \
+especifico). Si esta repartido de forma pareja entre todos los grados, dilo y \
+recomienda una estrategia transversal (ej. revisar el plan de area completo, \
+la malla curricular o la formacion docente en la materia, no solo un grado).
+- Cada grado puede traer 'tema_del_curriculo' (el o los temas de la malla \
+curricular para ese grado, a veces desglosados por periodo). Cuando este \
+presente en los grados de mayor riesgo, cita el tema concreto en la \
+descripcion y usalo para hacer las recomendaciones mas especificas (que \
+contenido revisar, no solo "la metodologia"). Cuando sea null, no lo \
+menciones ni inventes un tema.
+- Publico: coordinacion academica y jefes de area, no un estudiante ni su \
+familia. Tono profesional, basado en datos, nunca alarmista.
+- Las recomendaciones deben ser accionables por coordinacion en las proximas \
+semanas (3-5 frases de descripcion + 3-5 recomendaciones).
+- Responde siempre en español."""
+
+
+def explicar_materia(db: Session, materia: str, anio: str | None = None) -> dict:
+    """Devuelve {'descripcion': str, 'recomendaciones': list[str]} para UNA \
+    materia agregada (todos los grados), a partir de get_materia_detalle — \
+    para el boton 'Generar estrategia' de la fila de materia en el dashboard."""
+    detalle = get_materia_detalle(db, materia, anio)
+    if detalle is None:
+        raise AssistantError("No hay datos de riesgo para esa materia.")
+
+    client = _client()
+    response = _create(
+        client,
+        model=OPENAI_MODEL,
+        instructions=EXPLICACION_MATERIA_SYSTEM_PROMPT,
+        input=[{
+            "role": "user",
+            "content": "Estos son los datos reales agregados de la materia (no inventes otros):\n"
+                       + json.dumps(detalle, ensure_ascii=False, indent=2),
+        }],
+        text={
+            "format": {
+                "type": "json_schema",
+                "name": "explicacion_materia",
                 "strict": True,
                 "schema": {
                     "type": "object",

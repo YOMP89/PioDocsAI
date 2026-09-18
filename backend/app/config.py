@@ -17,6 +17,11 @@ DATABASE_URL = f"sqlite:///{DATABASE_PATH.as_posix()}"
 DATASET_CSV_PATH = Path(os.getenv("DATASET_CSV_PATH", DATA_DIR / "acumulado_desde_2020_al_2025_datos.csv"))
 MODEL_PATH = Path(os.getenv("MODEL_PATH", DATA_DIR / "modelo_riesgo_academico.joblib"))
 
+# Malla curricular (materia, grado, periodo -> tema), usada por el asistente
+# para citar el tema especifico al generar una estrategia. Es opcional: si el
+# archivo no esta presente, esa capa simplemente no se agrega.
+MALLA_CURRICULAR_CSV_PATH = Path(os.getenv("MALLA_CURRICULAR_CSV_PATH", DATA_DIR / "malla_curricular.csv"))
+
 # Umbrales de riesgo sobre la probabilidad devuelta por el modelo (0-1).
 # ALTO/MEDIO coinciden con el umbral de alerta usado en la fase 8 del notebook;
 # por debajo de ese umbral se clasifica como BAJO (no genera alerta).

@@ -9,7 +9,7 @@ import pandas as pd
 from sqlalchemy import delete, func, or_, select
 from sqlalchemy.orm import Session
 
-from app.config import UMBRAL_ALTO, UMBRAL_MEDIO
+from app.config import MALLA_CURRICULAR_CSV_PATH, UMBRAL_ALTO, UMBRAL_MEDIO
 from app.ml.pipeline import (build_feature_table, calcular_shap_summary, evaluar_modelo,
                               load_model_bundle, score_features, tendencia_texto)
 from app.models import Grade, RiskAlert
@@ -366,6 +366,142 @@ def get_subject_grade_heatmap(db: Session, anio: str | None = None) -> dict:
                 "estudiantes_en_riesgo": s["riesgo"], "estudiantes_evaluados": s["total"],
             }
             for (materia, curso), s in celdas.items()
+        ],
+    }
+
+
+_MALLA_ETIQUETA_ARTISTICA = re.compile(r"(Danzas|Artes Pl[aá]sticas|M[uú]sica)\s*:", re.IGNORECASE)
+
+# La malla curricular llego con nombres de materia distintos a los que trae
+# el consolidado academico (mayusculas, sinonimos, variantes de redaccion
+# entre los propios archivos Word de origen); este diccionario los hace
+# coincidir con RiskAlert.materia. No se tocan 'Matematicas' (sin tilde) ni
+# 'Etica y Valores': son los duplicados de datos ya identificados en
+# get_subjects_summary y se dejaron fuera de alcance alli tambien.
+_MALLA_RENOMBRES = {
+    "MATEMÁTICAS": "Matemáticas",
+    "ÉTICA": "Ética",
+    "Ciencias Sociales": "Sociales",
+    "Religión": "Educación Religiosa",
+    "Filosofía": "Filosofia",
+    "Idioma extranjero INGLÉS": "Inglés",
+    "Idioma extranjero: Inglés": "Inglés",
+    "Idioma extranjero: inglés": "Inglés",
+    "lenguaje": "Lenguaje",
+    "Tecnología e informática": "Tecnología e Informática",
+    "Educación Física, Recreación y Deporte": "Educación Física",
+}
+_MALLA_PERIODOS_ROMANOS = {"I": "1", "II": "2", "III": "3"}
+
+_malla_cache: dict[tuple[str, str], list[tuple[str, str]]] | None = None
+
+
+def _malla_materia_normalizada(materia: str, tema: str) -> str:
+    """'Educacion Artistica y cultural' llega en la malla como UNA materia
+    que mezcla Danzas/Artes Plasticas/Musica (cada tema trae su propia
+    etiqueta al inicio); en la BD el riesgo se calcula por separado para las
+    3, asi que se separan aqui usando esa etiqueta."""
+    if materia == "Educación Artística y cultural":
+        m = _MALLA_ETIQUETA_ARTISTICA.search(tema)
+        if m:
+            etiqueta = m.group(1).lower()
+            if etiqueta.startswith("danza"):
+                return "Danzas"
+            if etiqueta.startswith("artes"):
+                return "Artes"
+            return "Música"
+    return _MALLA_RENOMBRES.get(materia, materia)
+
+
+def cargar_malla_curricular(force: bool = False) -> dict[tuple[str, str], list[tuple[str, str]]]:
+    """Carga (una sola vez) malla_curricular.csv normalizando materia/grado a
+    la misma convencion que usa risk_alerts, para que explicar_materia() y
+    explicar_prediccion() puedan citar el tema exacto. Si el archivo no esta
+    presente, se sigue funcionando sin esta capa."""
+    global _malla_cache
+    if _malla_cache is not None and not force:
+        return _malla_cache
+
+    if not MALLA_CURRICULAR_CSV_PATH.exists():
+        _malla_cache = {}
+        return _malla_cache
+
+    df = pd.read_csv(MALLA_CURRICULAR_CSV_PATH, encoding="utf-8")
+    cache: dict[tuple[str, str], list[tuple[str, str]]] = {}
+    for fila in df.itertuples(index=False):
+        tema = str(fila.tema).strip()
+        materia = _malla_materia_normalizada(str(fila.materia), tema)
+        grado = str(fila.grado).strip()
+        grado = "1" if grado == "primero" else grado.rstrip("°")
+        periodo_raw = fila.periodo
+        periodo = _MALLA_PERIODOS_ROMANOS.get(str(periodo_raw).strip(), "") if pd.notna(periodo_raw) else ""
+        cache.setdefault((materia, grado), []).append((periodo, tema))
+
+    _malla_cache = cache
+    logger.info("Malla curricular cargada desde %s: %d materias/grados con tema.", MALLA_CURRICULAR_CSV_PATH, len(cache))
+    return cache
+
+
+def obtener_tema_materia(materia: str, curso: str) -> str | None:
+    """Tema(s) de la malla curricular para esta materia+grado (normalizada
+    igual que en get_subjects_summary), con el periodo cuando la malla lo
+    distingue. None si no hay malla cargada para esa combinacion — nunca se
+    inventa un tema."""
+    malla = cargar_malla_curricular()
+    if not malla:
+        return None
+    clave = (_materia_normalizada(materia, curso), str(curso).strip())
+    entradas = malla.get(clave)
+    if not entradas:
+        return None
+    if len(entradas) == 1 and not entradas[0][0]:
+        return entradas[0][1]
+    return "\n".join(f"Periodo {p}: {t}" if p else t for p, t in entradas)
+
+
+def get_materia_detalle(db: Session, materia: str, anio: str | None = None) -> dict | None:
+    """Agregado de UNA materia (ya normalizada) con desglose por grado, para
+    alimentar la estrategia que genera el asistente (ver
+    app.assistant.service.explicar_materia): permite decir si el riesgo esta
+    concentrado en un grado puntual o repartido de forma transversal."""
+    query = select(RiskAlert.materia, RiskAlert.curso, RiskAlert.area, RiskAlert.nivel_riesgo)
+    if anio:
+        query = query.where(RiskAlert.anio == anio)
+    filas = db.execute(query).all()
+
+    area = ""
+    total = 0
+    riesgo_total = 0
+    por_grado: dict[str, dict[str, int]] = {}
+    for fila_materia, curso, fila_area, nivel in filas:
+        if _materia_normalizada(fila_materia, curso) != materia:
+            continue
+        area = fila_area
+        total += 1
+        s = por_grado.setdefault(curso, {"total": 0, "riesgo": 0})
+        s["total"] += 1
+        if nivel in ("Alto", "Medio"):
+            riesgo_total += 1
+            s["riesgo"] += 1
+
+    if total == 0:
+        return None
+
+    return {
+        "materia": materia,
+        "area": area,
+        "risk_pct": round(100 * riesgo_total / total, 1),
+        "estudiantes_en_riesgo": riesgo_total,
+        "estudiantes_evaluados": total,
+        "por_grado": [
+            {
+                "grado": curso,
+                "risk_pct": round(100 * s["riesgo"] / s["total"], 1) if s["total"] else 0.0,
+                "estudiantes_en_riesgo": s["riesgo"],
+                "estudiantes_evaluados": s["total"],
+                "tema_del_curriculo": obtener_tema_materia(materia, curso),
+            }
+            for curso, s in sorted(por_grado.items(), key=lambda kv: int(kv[0]))
         ],
     }
 

@@ -248,6 +248,19 @@ export const api = {
     return body as ExplicacionPrediccion
   },
 
+  explicarMateria: async (materia: string, anio?: string): Promise<ExplicacionPrediccion> => {
+    const res = await fetch(`${API_URL}/api/assistant/explicar-materia`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ materia, anio: anio ?? null }),
+    })
+    const body = await res.json()
+    if (!res.ok) {
+      throw new Error(body?.detail || `No se pudo generar la estrategia (HTTP ${res.status})`)
+    }
+    return body as ExplicacionPrediccion
+  },
+
   importCsv: async (file: File): Promise<ImportResult> => {
     const form = new FormData()
     form.append('archivo', file)
