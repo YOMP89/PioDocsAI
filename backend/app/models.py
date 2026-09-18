@@ -80,6 +80,19 @@ class RiskAlert(Base):
     generado_en: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
 
 
+class User(Base):
+    """Cuentas de acceso al panel. Rol es texto libre por ahora (no hay logica
+    de permisos por rol todavia, solo se guarda para mostrarlo en el perfil)."""
+
+    __tablename__ = "users"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    username: Mapped[str] = mapped_column(String(60), unique=True, index=True)
+    password_hash: Mapped[str] = mapped_column(String(160))
+    rol: Mapped[str] = mapped_column(String(40))  # superadministrador | coordinacion_academica | orientacion_escolar
+    creado_en: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+
+
 class ImportBatch(Base):
     """Historial de archivos importados desde la pantalla 'Importar datos'."""
 

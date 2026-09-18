@@ -8,7 +8,7 @@ from app.config import CORS_ORIGINS
 from app.database import Base, SessionLocal, engine
 from app.ml.pipeline import load_model_bundle
 from app.routers import alerts, assistant, dashboard, imports, model_info, students, subjects
-from app.seed import run_seed
+from app.seed import run_seed, seed_users
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 logger = logging.getLogger("eduapp")
@@ -23,6 +23,14 @@ async def lifespan(app: FastAPI):
         run_seed(db)
     except Exception:
         logger.exception("El seed inicial fallo; la API sigue arriba, pero puede no tener datos.")
+    finally:
+        db.close()
+
+    db = SessionLocal()
+    try:
+        seed_users(db)
+    except Exception:
+        logger.exception("La creacion de usuarios iniciales fallo.")
     finally:
         db.close()
     yield

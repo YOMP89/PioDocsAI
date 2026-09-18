@@ -9,10 +9,17 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.config import DATASET_CSV_PATH, FORCE_RESEED
-from app.models import Grade
+from app.models import Grade, User
+from app.security import hash_password
 from app.services import insert_grades, read_grades_csv, recompute_risk_alerts
 
 logger = logging.getLogger("eduapp.seed")
+
+USUARIOS_INICIALES = [
+    {"username": "admin", "password": "12345", "rol": "superadministrador"},
+    {"username": "coordiaca", "password": "123456", "rol": "coordinacion_academica"},
+    {"username": "escolarori", "password": "12345678", "rol": "orientacion_escolar"},
+]
 
 
 def run_seed(db: Session) -> None:
@@ -43,3 +50,17 @@ def run_seed(db: Session) -> None:
     logger.info("Calculando alertas de riesgo con el modelo entrenado (Fase 9 del notebook)...")
     n_alertas = recompute_risk_alerts(db)
     logger.info("risk_alerts listo: %d combinaciones estudiante-materia evaluadas.", n_alertas)
+
+
+def seed_users(db: Session) -> None:
+    """Crea las cuentas iniciales del panel si 'users' esta vacia. No pisa
+    cuentas ya creadas ni corre de nuevo si alguien ya cambio algo."""
+    total = db.execute(select(func.count()).select_from(User)).scalar_one()
+    if total > 0:
+        logger.info("Ya hay %d cuentas en 'users'; se omite la creacion de usuarios iniciales.", total)
+        return
+
+    for u in USUARIOS_INICIALES:
+        db.add(User(username=u["username"], password_hash=hash_password(u["password"]), rol=u["rol"]))
+    db.commit()
+    logger.info("Usuarios iniciales creados: %s", ", ".join(u["username"] for u in USUARIOS_INICIALES))
