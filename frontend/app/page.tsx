@@ -35,6 +35,9 @@ import {
   Bar,
   BarChart,
   CartesianGrid,
+  Line,
+  LineChart,
+  ReferenceLine,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -413,6 +416,47 @@ function ModeloMLView() {
   return <div className="mx-auto max-w-3xl space-y-6">
     <div><p className="text-sm font-medium text-blue-600">Modelo de clasificación</p><h1 className="mt-1 text-3xl font-bold tracking-tight text-slate-950">Modelo ML</h1><p className="mt-2 text-sm leading-6 text-slate-500">Bosque aleatorio entrenado sobre el consolidado 2020-2025 (ver Proceso_ML_1_Clasificacion.ipynb, Fase 6 a 9).</p></div>
     <div className="grid gap-4 sm:grid-cols-2"><MetricCard title="AUC (prueba)" value={info.auc_prueba != null ? info.auc_prueba.toFixed(3) : '—'} helper="capacidad de ordenar el riesgo" icon={Gauge} tone="violet" /><MetricCard title="Umbral de alerta" value={info.umbral_alerta != null ? info.umbral_alerta.toFixed(2) : '—'} helper="probabilidad minima para alertar" icon={BrainCircuit} tone="blue" /><MetricCard title="Filas de entrenamiento" value={info.filas_entrenamiento?.toLocaleString('es-CO') ?? '—'} helper="combinaciones estudiante-materia" icon={Database} tone="orange" /><MetricCard title="Entrenado" value={info.fecha_entrenamiento ?? '—'} helper={`periodo de corte: ${info.periodo_corte ?? '—'}`} icon={Activity} tone="rose" /></div>
+    {(info.matriz_confusion || (info.curva_roc && info.curva_roc.length > 0)) && <div className="grid gap-6 lg:grid-cols-2">
+      {info.matriz_confusion && <section className="relative overflow-hidden rounded-2xl border border-blue-100 bg-linear-to-br from-blue-50/40 via-white to-white p-5 shadow-sm">
+        <div className="pointer-events-none absolute -right-12 -top-14 h-48 w-48 rounded-full bg-linear-to-br from-blue-300/30 to-violet-200/20 blur-3xl" />
+        <h2 className="relative font-bold text-slate-900">Matriz de confusión</h2>
+        <p className="relative mt-1 text-sm text-slate-500">Conjunto de prueba{info.filas_prueba != null ? ` (${info.filas_prueba.toLocaleString('es-CO')} filas, no vistas al entrenar)` : ''} · umbral {info.umbral_alerta?.toFixed(2) ?? '—'}.</p>
+        <div className="relative mt-5 grid grid-cols-[auto_1fr_1fr] gap-x-3 gap-y-2 text-sm">
+          <div />
+          <div className="self-end text-center text-xs font-semibold uppercase tracking-wide text-slate-400">Predijo: aprueba</div>
+          <div className="self-end text-center text-xs font-semibold uppercase tracking-wide text-slate-400">Predijo: reprueba</div>
+          <div className="flex items-center justify-center text-center text-xs font-semibold uppercase tracking-wide text-slate-400">Real:<br />aprueba</div>
+          <div className="rounded-xl border border-emerald-100 bg-emerald-50 p-4 text-center"><p className="text-2xl font-extrabold text-emerald-700">{info.matriz_confusion.verdaderos_negativos}</p><p className="mt-1 text-xs text-emerald-700/70">Verdaderos negativos</p></div>
+          <div className="rounded-xl border border-amber-100 bg-amber-50 p-4 text-center"><p className="text-2xl font-extrabold text-amber-700">{info.matriz_confusion.falsos_positivos}</p><p className="mt-1 text-xs text-amber-700/70">Falsos positivos</p></div>
+          <div className="flex items-center justify-center text-center text-xs font-semibold uppercase tracking-wide text-slate-400">Real:<br />reprueba</div>
+          <div className="rounded-xl border border-rose-100 bg-rose-50 p-4 text-center"><p className="text-2xl font-extrabold text-rose-700">{info.matriz_confusion.falsos_negativos}</p><p className="mt-1 text-xs text-rose-700/70">Falsos negativos</p></div>
+          <div className="rounded-xl border border-blue-100 bg-blue-50 p-4 text-center"><p className="text-2xl font-extrabold text-blue-700">{info.matriz_confusion.verdaderos_positivos}</p><p className="mt-1 text-xs text-blue-700/70">Verdaderos positivos</p></div>
+        </div>
+      </section>}
+      {info.curva_roc && info.curva_roc.length > 0 && <section className="relative overflow-hidden rounded-2xl border border-violet-100 bg-linear-to-br from-violet-50/40 via-white to-white p-5 shadow-sm">
+        <div className="pointer-events-none absolute -right-12 -top-14 h-48 w-48 rounded-full bg-linear-to-br from-violet-300/30 to-blue-200/20 blur-3xl" />
+        <div className="relative flex items-start justify-between gap-3"><div><h2 className="font-bold text-slate-900">Curva ROC</h2><p className="mt-1 text-sm text-slate-500">Verdaderos vs. falsos positivos en el conjunto de prueba.</p></div><span className="shrink-0 rounded-full bg-violet-100 px-3 py-1 text-xs font-bold text-violet-700">AUC {info.auc_prueba != null ? info.auc_prueba.toFixed(3) : '—'}</span></div>
+        <div className="relative mt-4 h-64 w-full">
+          <ResponsiveContainer width="100%" height="100%">
+            <LineChart data={info.curva_roc} margin={{ left: 4, right: 16, top: 8, bottom: 4 }}>
+              <defs>
+                <linearGradient id="gradienteRoc" x1="0" y1="0" x2="1" y2="0">
+                  <stop offset="0%" stopColor="#8B7CFF" />
+                  <stop offset="100%" stopColor="#4F3DDB" />
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+              <XAxis dataKey="fpr" type="number" domain={[0, 1]} tick={{ fontSize: 11 }} tickFormatter={(v: number) => v.toFixed(1)} />
+              <YAxis dataKey="tpr" type="number" domain={[0, 1]} tick={{ fontSize: 11 }} tickFormatter={(v: number) => v.toFixed(1)} />
+              <Tooltip formatter={(v: number) => v.toFixed(3)} labelFormatter={(v) => `FPR ${Number(v).toFixed(3)}`} />
+              <ReferenceLine segment={[{ x: 0, y: 0 }, { x: 1, y: 1 }]} stroke="#cbd5e1" strokeDasharray="4 4" />
+              <Line type="monotone" dataKey="tpr" name="Modelo" stroke="url(#gradienteRoc)" strokeWidth={2} dot={false} />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+        <p className="relative mt-2 text-xs text-slate-400">Línea punteada: clasificador aleatorio, solo de referencia. Entre más se acerque la curva a la esquina superior izquierda, mejor distingue el modelo entre quién reprueba y quién no.</p>
+      </section>}
+    </div>}
     {info.importancia_variables && <section className="relative overflow-hidden rounded-2xl border border-amber-100 bg-linear-to-br from-amber-50/50 via-white to-white p-5 shadow-sm">
       <div className="pointer-events-none absolute -right-12 -top-14 h-48 w-48 rounded-full bg-linear-to-br from-amber-300/30 to-rose-200/15 blur-3xl" />
       <h2 className="relative font-bold text-slate-900">Importancia de variables</h2>

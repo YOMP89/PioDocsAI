@@ -11,6 +11,8 @@ from pathlib import Path
 import joblib
 import numpy as np
 import pandas as pd
+from sklearn.metrics import confusion_matrix, roc_auc_score, roc_curve
+from sklearn.model_selection import train_test_split
 
 from app.config import MODEL_PATH, UMBRAL_ALTO, UMBRAL_MEDIO
 
@@ -177,3 +179,62 @@ def score_features(data: pd.DataFrame, bundle: dict | None) -> pd.DataFrame:
 
 def tendencia_para(data_row: pd.Series) -> str:
     return tendencia_texto(data_row["tendencia"])
+
+
+def evaluar_modelo(df: pd.DataFrame, bundle: dict | None, cutoff: int = CUTOFF) -> dict | None:
+    """Reproduce la particion 70/30 estratificada de la Fase 5 del notebook
+    (train_size=0.7, random_state=42) sobre los datos que hoy viven en la base
+    de datos, y evalua el modelo cargado en la porcion de prueba: matriz de
+    confusion y curva ROC sobre casos que el modelo no vio al entrenar."""
+    if bundle is None:
+        return None
+
+    data = build_feature_table(df, cutoff=cutoff)
+    if data.empty:
+        return None
+
+    periodo_objetivo = cutoff + 1
+    resultado_final = (df[df.periodo == periodo_objetivo]
+                        .drop_duplicates(["anio", "cod_estudiante", "materia"], keep="last")
+                        .set_index(["anio", "cod_estudiante", "materia"])["estado"])
+
+    data = data.join(resultado_final.rename("estado_final"))
+    data = data.dropna(subset=["estado_final"])
+    if data.empty:
+        return None
+    data["reprobo_final"] = (data["estado_final"] == 2).astype(int)
+
+    features = bundle.get("features", FEATURES)
+    X = data[features].astype(float)
+    y = data["reprobo_final"]
+    if y.nunique() < 2:
+        return None
+
+    _, X_test, _, y_test = train_test_split(
+        X, y, train_size=0.7, random_state=42, stratify=y)
+
+    modelo = bundle["modelo"]
+    y_prob = modelo.predict_proba(X_test)[:, 1]
+    umbral = bundle.get("umbral_alerta", UMBRAL_MEDIO)
+    y_pred = (y_prob >= umbral).astype(int)
+
+    tn, fp, fn, tp = confusion_matrix(y_test, y_pred, labels=[0, 1]).ravel()
+    fpr, tpr, _ = roc_curve(y_test, y_prob)
+    auc = roc_auc_score(y_test, y_prob)
+
+    # La curva no necesita cada punto de corte de un test set de miles de
+    # filas para dibujarse bien; se reduce a un maximo de 60 puntos.
+    if len(fpr) > 60:
+        idx = np.unique(np.linspace(0, len(fpr) - 1, 60).round().astype(int))
+        fpr, tpr = fpr[idx], tpr[idx]
+
+    return {
+        "filas_prueba": int(len(y_test)),
+        "umbral_usado": float(umbral),
+        "auc_prueba_actual": float(auc),
+        "matriz_confusion": {
+            "verdaderos_negativos": int(tn), "falsos_positivos": int(fp),
+            "falsos_negativos": int(fn), "verdaderos_positivos": int(tp),
+        },
+        "curva_roc": [{"fpr": float(f), "tpr": float(t)} for f, t in zip(fpr, tpr)],
+    }

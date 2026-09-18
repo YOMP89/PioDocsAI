@@ -85,6 +85,18 @@ export interface EstudianteDetalle {
   materias: MateriaEstudiante[]
 }
 
+export interface MatrizConfusion {
+  verdaderos_negativos: number
+  falsos_positivos: number
+  falsos_negativos: number
+  verdaderos_positivos: number
+}
+
+export interface PuntoROC {
+  fpr: number
+  tpr: number
+}
+
 export interface ModelInfo {
   disponible: boolean
   fecha_entrenamiento: string | null
@@ -94,6 +106,9 @@ export interface ModelInfo {
   filas_entrenamiento: number | null
   features: string[]
   importancia_variables: Record<string, number> | null
+  filas_prueba: number | null
+  matriz_confusion: MatrizConfusion | null
+  curva_roc: PuntoROC[] | null
 }
 
 export interface ChatTurn {

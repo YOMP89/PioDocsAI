@@ -80,6 +80,18 @@ class EstudianteDetalle(BaseModel):
     materias: list[MateriaEstudiante]
 
 
+class MatrizConfusion(BaseModel):
+    verdaderos_negativos: int
+    falsos_positivos: int
+    falsos_negativos: int
+    verdaderos_positivos: int
+
+
+class PuntoROC(BaseModel):
+    fpr: float
+    tpr: float
+
+
 class ModelInfo(BaseModel):
     disponible: bool
     fecha_entrenamiento: str | None = None
@@ -89,6 +101,9 @@ class ModelInfo(BaseModel):
     filas_entrenamiento: int | None = None
     features: list[str] = []
     importancia_variables: dict[str, float] | None = None
+    filas_prueba: int | None = None
+    matriz_confusion: MatrizConfusion | None = None
+    curva_roc: list[PuntoROC] | None = None
 
 
 class ImportResult(BaseModel):
