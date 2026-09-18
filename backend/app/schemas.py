@@ -204,6 +204,16 @@ class ExplicacionMateriaRequest(BaseModel):
     anio: str | None = None
 
 
+class LoginRequest(BaseModel):
+    username: str
+    password: str
+
+
+class LoginResponse(BaseModel):
+    username: str
+    rol: str
+
+
 class ImportBatchOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

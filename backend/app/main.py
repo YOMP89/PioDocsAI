@@ -7,7 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.config import CORS_ORIGINS
 from app.database import Base, SessionLocal, engine
 from app.ml.pipeline import load_model_bundle
-from app.routers import alerts, assistant, dashboard, imports, model_info, students, subjects
+from app.routers import alerts, assistant, auth, dashboard, imports, model_info, students, subjects
 from app.seed import run_seed, seed_users
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
@@ -59,6 +59,7 @@ app.include_router(students.router)
 app.include_router(imports.router)
 app.include_router(model_info.router)
 app.include_router(assistant.router)
+app.include_router(auth.router)
 
 
 @app.get("/api/health", tags=["health"])

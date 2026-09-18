@@ -12,9 +12,20 @@ from sqlalchemy.orm import Session
 from app.config import MALLA_CURRICULAR_CSV_PATH, UMBRAL_ALTO, UMBRAL_MEDIO
 from app.ml.pipeline import (build_feature_table, calcular_shap_summary, evaluar_modelo,
                               load_model_bundle, score_features, tendencia_texto)
-from app.models import Grade, RiskAlert
+from app.models import Grade, RiskAlert, User
+from app.security import verify_password
 
 logger = logging.getLogger("eduapp.services")
+
+
+def authenticate_user(db: Session, username: str, password: str) -> User | None:
+    """Verifica usuario/contrasena contra la tabla 'users' (ver app.security
+    para el hash). Devuelve None tanto si el usuario no existe como si la
+    contrasena no coincide, para no revelar cual de los dos caso ocurrio."""
+    user = db.execute(select(User).where(User.username == username)).scalar_one_or_none()
+    if user is None or not verify_password(password, user.password_hash):
+        return None
+    return user
 
 # Columnas que produce el consolidado (ver hoja 'Diccionario' del Excel de
 # origen). Se aceptan variantes de nombre porque el CSV se puede reexportar

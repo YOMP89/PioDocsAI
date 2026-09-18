@@ -53,6 +53,11 @@ export interface DashboardSummary {
   materias_top: MateriaResumen[]
 }
 
+export interface SesionUsuario {
+  username: string
+  rol: 'superadministrador' | 'coordinacion_academica' | 'orientacion_escolar'
+}
+
 export interface AlertaOut {
   id: number
   anio: string
@@ -272,5 +277,18 @@ export const api = {
       throw new Error(body?.detail || `Error al importar (HTTP ${res.status})`)
     }
     return body as ImportResult
+  },
+
+  login: async (username: string, password: string): Promise<SesionUsuario> => {
+    const res = await fetch(`${API_URL}/api/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password }),
+    })
+    const body = await res.json()
+    if (!res.ok) {
+      throw new Error(body?.detail || `No se pudo iniciar sesión (HTTP ${res.status})`)
+    }
+    return body as SesionUsuario
   },
 }
