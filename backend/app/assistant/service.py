@@ -168,6 +168,20 @@ orientacion en las proximas semanas.
 materia y grado, a veces por periodo), usalo para que las recomendaciones \
 sean sobre el contenido concreto (ej. reforzar ese tema puntual) en vez de \
 genericas. Si no viene, no lo menciones ni inventes un tema.
+- 'temas_para_estudiar' es una lista aparte, dirigida al estudiante, con el \
+contenido concreto que debe repasar: cuando 'tema_del_curriculo' venga \
+desglosado por periodo, prioriza los periodos donde la nota fue mas baja \
+(nota_periodo_1/2/3) y desglosa ese tema en 3-6 puntos de estudio concretos \
+y accionables (ej. subtemas, tipos de ejercicio, habilidades puntuales), no \
+solo repitas el nombre del tema tal cual. Nunca inventes contenido que no se \
+derive de 'tema_del_curriculo'; si no viene, deja esta lista vacia.
+- 'ejercicios_a_entregar' son 1-2 ejercicios o tareas puntuales (maximo 2) que \
+el docente le puede asignar al estudiante para entregar, relacionados \
+directamente con los puntos de 'temas_para_estudiar' (ej. "resolver 5 \
+ejercicios de sistemas de ecuaciones 2x2 aplicados a un problema cotidiano y \
+explicar el procedimiento paso a paso"). Deben ser concretos y verificables \
+(algo que se pueda revisar y calificar), no genericos como "estudiar mas". Si \
+'temas_para_estudiar' quedo vacio, deja esta lista vacia tambien.
 - Responde siempre en español."""
 
 
@@ -219,8 +233,10 @@ def explicar_prediccion(db: Session, anio: str, cod_estudiante: int, materia: st
                     "properties": {
                         "descripcion": {"type": "string"},
                         "recomendaciones": {"type": "array", "items": {"type": "string"}, "minItems": 3, "maxItems": 5},
+                        "temas_para_estudiar": {"type": "array", "items": {"type": "string"}, "minItems": 0, "maxItems": 6},
+                        "ejercicios_a_entregar": {"type": "array", "items": {"type": "string"}, "minItems": 0, "maxItems": 2},
                     },
-                    "required": ["descripcion", "recomendaciones"],
+                    "required": ["descripcion", "recomendaciones", "temas_para_estudiar", "ejercicios_a_entregar"],
                     "additionalProperties": False,
                 },
             },

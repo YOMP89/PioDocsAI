@@ -189,6 +189,8 @@ export interface ImportResult {
 export interface ExplicacionPrediccion {
   descripcion: string
   recomendaciones: string[]
+  temas_para_estudiar?: string[]
+  ejercicios_a_entregar?: string[]
 }
 
 export const api = {

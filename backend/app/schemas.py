@@ -195,6 +195,8 @@ class ExplicacionRequest(BaseModel):
 class ExplicacionResponse(BaseModel):
     descripcion: str
     recomendaciones: list[str]
+    temas_para_estudiar: list[str] = []
+    ejercicios_a_entregar: list[str] = []
 
 
 class ExplicacionMateriaRequest(BaseModel):
