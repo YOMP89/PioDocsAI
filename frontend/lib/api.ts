@@ -28,6 +28,20 @@ export interface MateriaResumen {
   estudiantes_evaluados: number
 }
 
+export interface CeldaMateriaGrado {
+  materia: string
+  grado: string
+  risk_pct: number
+  estudiantes_en_riesgo: number
+  estudiantes_evaluados: number
+}
+
+export interface HeatmapMateriaGrado {
+  materias: string[]
+  grados: string[]
+  celdas: CeldaMateriaGrado[]
+}
+
 export interface DashboardSummary {
   anio: string
   anios_disponibles: string[]
@@ -199,6 +213,9 @@ export const api = {
 
   subjects: (anio?: string) =>
     apiGet<MateriaResumen[]>(`/api/subjects/summary${anio ? `?anio=${encodeURIComponent(anio)}` : ''}`),
+
+  subjectGradeHeatmap: (anio?: string) =>
+    apiGet<HeatmapMateriaGrado>(`/api/subjects/heatmap${anio ? `?anio=${encodeURIComponent(anio)}` : ''}`),
 
   student: (anio: string, codEstudiante: number) =>
     apiGet<EstudianteDetalle>(`/api/students/${encodeURIComponent(anio)}/${codEstudiante}`),

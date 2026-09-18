@@ -3,6 +3,7 @@ archivos y los routers: cargar filas en 'grades' y recalcular 'risk_alerts'."""
 from __future__ import annotations
 
 import logging
+import re
 
 import pandas as pd
 from sqlalchemy import delete, func, or_, select
@@ -294,14 +295,30 @@ def get_probability_histogram(db: Session, anio: str | None = None, bins: int = 
     }
 
 
+_SUFIJO_GRADO = re.compile(r"^(.*?)\s+(\d{1,2})\u00b0$")
+
+
+def _materia_normalizada(materia: str, curso: str) -> str:
+    """El consolidado trae, para algunos grados, el nombre de la materia con
+    el grado incrustado (ej. 'Matematicas 9\u00b0' en filas donde curso ya vale
+    '9'), lo que duplicaba la fila en la tabla de materias. Si el sufijo
+    coincide con el curso de esa misma fila, se recorta para que quede una
+    sola materia y el grado se lea en su propia columna."""
+    m = _SUFIJO_GRADO.match(materia.strip())
+    if m and m.group(2).lstrip("0") == curso.lstrip("0"):
+        return m.group(1).strip()
+    return materia
+
+
 def get_subjects_summary(db: Session, anio: str | None = None) -> list[dict]:
-    query = select(RiskAlert.materia, RiskAlert.area, RiskAlert.nivel_riesgo)
+    query = select(RiskAlert.materia, RiskAlert.curso, RiskAlert.area, RiskAlert.nivel_riesgo)
     if anio:
         query = query.where(RiskAlert.anio == anio)
     filas = db.execute(query).all()
 
     stats: dict[tuple[str, str], dict[str, int]] = {}
-    for materia, area, nivel in filas:
+    for materia, curso, area, nivel in filas:
+        materia = _materia_normalizada(materia, curso)
         s = stats.setdefault((materia, area), {"total": 0, "riesgo": 0})
         s["total"] += 1
         if nivel in ("Alto", "Medio"):
@@ -316,6 +333,41 @@ def get_subjects_summary(db: Session, anio: str | None = None) -> list[dict]:
         for (materia, area), s in stats.items()
     ]
     return sorted(resultado, key=lambda m: m["risk_pct"], reverse=True)
+
+
+def get_subject_grade_heatmap(db: Session, anio: str | None = None) -> dict:
+    """Cruce materia (normalizada, ver _materia_normalizada) x grado: deja ver
+    de un vistazo si el riesgo de una materia es transversal a todos los
+    grados o se concentra en uno puntual, algo que la tabla plana de
+    get_subjects_summary no muestra."""
+    query = select(RiskAlert.materia, RiskAlert.curso, RiskAlert.nivel_riesgo)
+    if anio:
+        query = query.where(RiskAlert.anio == anio)
+    filas = db.execute(query).all()
+
+    celdas: dict[tuple[str, str], dict[str, int]] = {}
+    for materia, curso, nivel in filas:
+        materia = _materia_normalizada(materia, curso)
+        s = celdas.setdefault((materia, curso), {"total": 0, "riesgo": 0})
+        s["total"] += 1
+        if nivel in ("Alto", "Medio"):
+            s["riesgo"] += 1
+
+    materias = sorted({materia for materia, _curso in celdas})
+    grados = sorted({curso for _materia, curso in celdas}, key=int)
+
+    return {
+        "materias": materias,
+        "grados": grados,
+        "celdas": [
+            {
+                "materia": materia, "grado": curso,
+                "risk_pct": round(100 * s["riesgo"] / s["total"], 1) if s["total"] else 0.0,
+                "estudiantes_en_riesgo": s["riesgo"], "estudiantes_evaluados": s["total"],
+            }
+            for (materia, curso), s in celdas.items()
+        ],
+    }
 
 
 def get_student_detail(db: Session, anio: str, cod_estudiante: int) -> dict | None:

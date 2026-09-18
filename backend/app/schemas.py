@@ -21,6 +21,20 @@ class MateriaResumen(BaseModel):
     estudiantes_evaluados: int
 
 
+class CeldaMateriaGrado(BaseModel):
+    materia: str
+    grado: str
+    risk_pct: float
+    estudiantes_en_riesgo: int
+    estudiantes_evaluados: int
+
+
+class HeatmapMateriaGrado(BaseModel):
+    materias: list[str]
+    grados: list[str]
+    celdas: list[CeldaMateriaGrado]
+
+
 class DashboardSummary(BaseModel):
     anio: str
     anios_disponibles: list[str]

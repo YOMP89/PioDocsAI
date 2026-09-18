@@ -52,6 +52,7 @@ import {
   type DashboardSummary,
   type EstudianteDetalle,
   type ExplicacionPrediccion,
+  type HeatmapMateriaGrado,
   type HistogramaProbabilidad,
   type MateriaResumen,
   type ModelInfo,
@@ -279,14 +280,26 @@ function DataImport() {
   </div>
 }
 
+// Color secuencial (un solo tono, claro -> oscuro) para el heatmap materia x
+// grado: 0% de riesgo en rosa casi blanco, 100% en rosa profundo. Coherente
+// con el resto de la app, donde el rosa/rojo ya identifica "riesgo".
+function colorMapaCalor(pct: number) {
+  const t = Math.max(0, Math.min(1, pct / 100))
+  const a: [number, number, number] = [255, 241, 242]
+  const b: [number, number, number] = [190, 18, 60]
+  const mix = (i: number) => Math.round(a[i] + (b[i] - a[i]) * t)
+  return `rgb(${mix(0)}, ${mix(1)}, ${mix(2)})`
+}
+
 function MateriasView() {
   const [materias, setMaterias] = useState<MateriaResumen[] | null>(null)
+  const [heatmap, setHeatmap] = useState<HeatmapMateriaGrado | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     let cancelado = false
-    api.subjects()
-      .then((data) => { if (!cancelado) setMaterias(data) })
+    Promise.all([api.subjects(), api.subjectGradeHeatmap()])
+      .then(([data, hm]) => { if (!cancelado) { setMaterias(data); setHeatmap(hm) } })
       .catch((err) => { if (!cancelado) setError(err instanceof Error ? err.message : String(err)) })
     return () => { cancelado = true }
   }, [])
@@ -307,6 +320,8 @@ function MateriasView() {
   const top = Array.from(combinadas, ([materia, { total, riesgo }]) => ({
     materia, risk_pct: total ? Math.round((1000 * riesgo) / total) / 10 : 0,
   })).sort((a, b) => b.risk_pct - a.risk_pct).slice(0, 12)
+
+  const celdaPorMateriaGrado = new Map((heatmap?.celdas ?? []).map((c) => [`${c.materia}|${c.grado}`, c]))
 
   return <div className="space-y-6">
     <div><p className="text-sm font-medium text-blue-600">Consolidado académico 2020-2025</p><h1 className="mt-1 text-3xl font-bold tracking-tight text-slate-950">Materias</h1><p className="mt-2 text-sm leading-6 text-slate-500">Porcentaje de estudiantes en riesgo (alto o medio) por materia, calculado sobre acumulado_desde_2020_al_2025_datos.csv.</p></div>
@@ -332,6 +347,42 @@ function MateriasView() {
         </ResponsiveContainer>
       </div>
     </section>
+    {heatmap && heatmap.celdas.length > 0 && <section className="relative overflow-hidden rounded-2xl border border-rose-100 bg-linear-to-br from-rose-50/40 via-white to-white p-5 shadow-sm">
+      <div className="pointer-events-none absolute -right-12 -top-14 h-48 w-48 rounded-full bg-linear-to-br from-rose-300/25 to-amber-200/15 blur-3xl" />
+      <h2 className="relative font-bold text-slate-900">Materia × grado</h2>
+      <p className="relative mt-1 text-sm text-slate-500">Porcentaje de estudiantes en riesgo por materia y grado: una fila pareja indica un problema transversal a la materia; un solo cuadro oscuro indica que se concentra en ese grado.</p>
+      <div className="relative mt-3 flex items-center gap-2 text-xs text-slate-500">
+        <span>Riesgo:</span>
+        <span className="h-2.5 w-24 rounded-full bg-linear-to-r from-rose-50 to-rose-700 ring-1 ring-inset ring-slate-200/80" />
+        <span>0%</span><span className="text-slate-300">·</span><span>100%</span>
+      </div>
+      <div className="relative mt-4 overflow-x-auto pb-1">
+        <table className="border-separate border-spacing-1 text-xs">
+          <thead>
+            <tr>
+              <th className="sticky left-0 z-10 bg-white px-2 py-1 text-left font-semibold text-slate-500">Materia</th>
+              {heatmap.grados.map((g) => <th key={g} className="px-1 py-1 text-center font-semibold text-slate-500">{g}°</th>)}
+            </tr>
+          </thead>
+          <tbody>
+            {heatmap.materias.map((m) => <tr key={m}>
+              <td className="sticky left-0 z-10 whitespace-nowrap bg-white py-1 pr-3 font-medium text-slate-700">{m}</td>
+              {heatmap.grados.map((g) => {
+                const celda = celdaPorMateriaGrado.get(`${m}|${g}`)
+                if (!celda) return <td key={g} className="h-8 w-8 rounded-md bg-slate-50" />
+                return <td key={g} className="group relative h-8 w-8 rounded-md text-center align-middle" style={{ backgroundColor: colorMapaCalor(celda.risk_pct) }}>
+                  <span className={`text-[10px] font-semibold ${celda.risk_pct >= 45 ? 'text-white' : 'text-slate-700'}`}>{Math.round(celda.risk_pct)}</span>
+                  <div className="pointer-events-none absolute left-1/2 top-full z-20 mt-1 hidden -translate-x-1/2 whitespace-nowrap rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-700 shadow-lg group-hover:block">
+                    <p className="font-semibold">{m} · {g}°</p>
+                    <p className="text-slate-500">{celda.risk_pct}% en riesgo ({celda.estudiantes_en_riesgo}/{celda.estudiantes_evaluados})</p>
+                  </div>
+                </td>
+              })}
+            </tr>)}
+          </tbody>
+        </table>
+      </div>
+    </section>}
     <section className="rounded-2xl border border-slate-200 bg-white shadow-sm">
       <div className="border-b border-slate-100 p-5"><h2 className="font-bold text-slate-900">Todas las materias</h2><p className="mt-1 text-sm text-slate-500">{materias.length} materias evaluadas por el modelo.</p></div>
       <div className="overflow-x-auto"><table className="w-full min-w-[600px] text-left text-sm"><thead className="bg-slate-50/70 text-xs uppercase tracking-wider text-slate-400"><tr><th className="px-5 py-3 font-semibold">Materia</th><th className="px-5 py-3 font-semibold">Área</th><th className="px-5 py-3 font-semibold">Riesgo</th><th className="px-5 py-3 font-semibold">En riesgo</th><th className="px-5 py-3 font-semibold">Evaluados</th></tr></thead><tbody className="divide-y divide-slate-100">{materias.map((m) => <tr key={`${m.materia}-${m.area}`} className="transition hover:bg-slate-50/60"><td className="px-5 py-3 font-medium text-slate-700">{m.materia}</td><td className="px-5 py-3 text-slate-500">{m.area}</td><td className="px-5 py-3 font-semibold text-slate-800">{m.risk_pct}%</td><td className="px-5 py-3 text-slate-600">{m.estudiantes_en_riesgo}</td><td className="px-5 py-3 text-slate-600">{m.estudiantes_evaluados}</td></tr>)}</tbody></table></div>
