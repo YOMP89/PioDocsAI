@@ -532,8 +532,16 @@ def get_student_detail(db: Session, anio: str, cod_estudiante: int) -> dict | No
             "probabilidad_riesgo": round(alerta.probabilidad_riesgo * 100, 1) if alerta else None,
             "nivel_riesgo": alerta.nivel_riesgo if alerta else None,
             "recomendacion": alerta.recomendacion if alerta else None,
+            "_prob_sin_redondear": alerta.probabilidad_riesgo if alerta else -1,
         })
-    materias.sort(key=lambda m: (m["probabilidad_riesgo"] if m["probabilidad_riesgo"] is not None else -1), reverse=True)
+    # Ordenar por la probabilidad SIN redondear: dos materias que muestran el
+    # mismo % redondeado (ej. 97.2 vs 97.2) no deben desempatar por orden de
+    # insercion (alfabetico), sino por cual es realmente mayor. La materia en
+    # el puesto 0 es la que usan tanto el panel "¿Por que esta alerta?" como
+    # el boton "Generar estrategia de apoyo".
+    materias.sort(key=lambda m: m["_prob_sin_redondear"], reverse=True)
+    for m in materias:
+        del m["_prob_sin_redondear"]
 
     primero = notas[0]
     return {
