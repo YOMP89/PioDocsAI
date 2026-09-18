@@ -97,6 +97,17 @@ export interface PuntoROC {
   tpr: number
 }
 
+export interface PuntoSHAP {
+  valor_shap: number
+  valor_normalizado: number // 0 (valor bajo de la variable) a 1 (valor alto), para el color del punto
+}
+
+export interface VariableSHAP {
+  variable: string
+  media_abs_shap: number
+  puntos: PuntoSHAP[]
+}
+
 export interface ModelInfo {
   disponible: boolean
   fecha_entrenamiento: string | null
@@ -109,6 +120,8 @@ export interface ModelInfo {
   filas_prueba: number | null
   matriz_confusion: MatrizConfusion | null
   curva_roc: PuntoROC[] | null
+  shap_variables: VariableSHAP[] | null
+  shap_filas_muestreadas: number | null
 }
 
 export interface ChatTurn {

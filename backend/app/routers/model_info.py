@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.ml.pipeline import FEATURES, load_model_bundle
 from app.schemas import ModelInfo
-from app.services import get_model_metrics
+from app.services import get_model_metrics, get_model_shap
 
 router = APIRouter(prefix="/api/model", tags=["model"])
 
@@ -23,6 +23,7 @@ def info(db: Session = Depends(get_db)):
         importancias = dict(sorted(pares, key=lambda kv: kv[1], reverse=True))
 
     metricas = get_model_metrics(db)
+    shap_resumen = get_model_shap(db)
 
     return ModelInfo(
         disponible=True,
@@ -36,4 +37,6 @@ def info(db: Session = Depends(get_db)):
         filas_prueba=metricas.get("filas_prueba") if metricas else None,
         matriz_confusion=metricas.get("matriz_confusion") if metricas else None,
         curva_roc=metricas.get("curva_roc") if metricas else None,
+        shap_variables=shap_resumen.get("variables") if shap_resumen else None,
+        shap_filas_muestreadas=shap_resumen.get("filas_muestreadas") if shap_resumen else None,
     )

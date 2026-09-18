@@ -8,8 +8,8 @@ import pandas as pd
 from sqlalchemy import delete, func, or_, select
 from sqlalchemy.orm import Session
 
-from app.ml.pipeline import (build_feature_table, evaluar_modelo, load_model_bundle,
-                              score_features, tendencia_texto)
+from app.ml.pipeline import (build_feature_table, calcular_shap_summary, evaluar_modelo,
+                              load_model_bundle, score_features, tendencia_texto)
 from app.models import Grade, RiskAlert
 
 logger = logging.getLogger("eduapp.services")
@@ -128,23 +128,37 @@ def recompute_risk_alerts(db: Session, anios: list[str] | None = None) -> int:
 # muestre un numero distinto al del dashboard.
 # ---------------------------------------------------------------------------
 
-def get_model_metrics(db: Session) -> dict | None:
-    """Matriz de confusion y curva ROC del modelo cargado, evaluadas sobre la
-    misma particion de prueba 70/30 de la Fase 5 del notebook (ver
-    app.ml.pipeline.evaluar_modelo)."""
+def _grades_dataframe(db: Session) -> pd.DataFrame:
     rows = db.execute(
         select(Grade.anio, Grade.periodo, Grade.cod_estudiante, Grade.sexo,
                Grade.curso, Grade.seccion, Grade.area, Grade.materia,
                Grade.valor, Grade.estado)
     ).all()
-    if not rows:
-        return None
+    return pd.DataFrame(rows, columns=["anio", "periodo", "cod_estudiante", "sexo",
+                                        "curso", "seccion", "area", "materia",
+                                        "valor", "estado"])
 
-    df = pd.DataFrame(rows, columns=["anio", "periodo", "cod_estudiante", "sexo",
-                                      "curso", "seccion", "area", "materia",
-                                      "valor", "estado"])
+
+def get_model_metrics(db: Session) -> dict | None:
+    """Matriz de confusion y curva ROC del modelo cargado, evaluadas sobre la
+    misma particion de prueba 70/30 de la Fase 5 del notebook (ver
+    app.ml.pipeline.evaluar_modelo)."""
+    df = _grades_dataframe(db)
+    if df.empty:
+        return None
     bundle = load_model_bundle()
     return evaluar_modelo(df, bundle)
+
+
+def get_model_shap(db: Session) -> dict | None:
+    """Resumen SHAP (TreeExplainer) del modelo cargado, para el grafico de
+    interpretabilidad ('summary plot') de la pestaña Modelo ML (ver
+    app.ml.pipeline.calcular_shap_summary)."""
+    df = _grades_dataframe(db)
+    if df.empty:
+        return None
+    bundle = load_model_bundle()
+    return calcular_shap_summary(df, bundle)
 
 
 def get_anios_disponibles(db: Session) -> list[str]:

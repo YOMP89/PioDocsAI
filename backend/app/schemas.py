@@ -92,6 +92,17 @@ class PuntoROC(BaseModel):
     tpr: float
 
 
+class PuntoSHAP(BaseModel):
+    valor_shap: float  # impacto de esa variable, en ese caso, sobre la probabilidad de reprobar
+    valor_normalizado: float  # 0 (valor bajo de la variable) a 1 (valor alto), para el color del punto
+
+
+class VariableSHAP(BaseModel):
+    variable: str
+    media_abs_shap: float  # magnitud promedio del impacto (para ordenar de mas a menos influyente)
+    puntos: list[PuntoSHAP]
+
+
 class ModelInfo(BaseModel):
     disponible: bool
     fecha_entrenamiento: str | None = None
@@ -104,6 +115,8 @@ class ModelInfo(BaseModel):
     filas_prueba: int | None = None
     matriz_confusion: MatrizConfusion | None = None
     curva_roc: list[PuntoROC] | None = None
+    shap_variables: list[VariableSHAP] | None = None
+    shap_filas_muestreadas: int | None = None
 
 
 class ImportResult(BaseModel):

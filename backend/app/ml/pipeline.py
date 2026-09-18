@@ -238,3 +238,68 @@ def evaluar_modelo(df: pd.DataFrame, bundle: dict | None, cutoff: int = CUTOFF) 
         },
         "curva_roc": [{"fpr": float(f), "tpr": float(t)} for f, t in zip(fpr, tpr)],
     }
+
+
+def calcular_shap_summary(df: pd.DataFrame, bundle: dict | None, cutoff: int = CUTOFF,
+                           muestra: int = 300) -> dict | None:
+    """Valores SHAP (TreeExplainer) sobre una muestra de combinaciones
+    estudiante-materia actuales: a diferencia de la impureza Gini (que solo
+    dice cuanto pesa cada variable), esto muestra ademas la direccion del
+    efecto — si un valor alto de esa variable empuja la probabilidad de
+    reprobar hacia arriba o hacia abajo — para el grafico tipo 'summary plot'
+    de la pestaña Modelo ML."""
+    if bundle is None:
+        return None
+
+    data = build_feature_table(df, cutoff=cutoff)
+    if data.empty:
+        return None
+
+    features = bundle.get("features", FEATURES)
+    X = data[features].astype(float)
+    if len(X) > muestra:
+        X = X.sample(n=muestra, random_state=42)
+    if X.empty:
+        return None
+
+    try:
+        import shap
+    except ImportError:
+        logger.warning("El paquete 'shap' no esta instalado; se omite el resumen SHAP.")
+        return None
+
+    modelo = bundle["modelo"]
+    explainer = shap.TreeExplainer(modelo)
+    shap_values = np.asarray(explainer.shap_values(X))
+    # RandomForestClassifier binario: TreeExplainer devuelve
+    # (n_muestras, n_variables, 2 clases) o, en versiones viejas de shap, una
+    # lista de 2 arreglos (n_muestras, n_variables). En ambos casos se toma la
+    # clase positiva (1 = reprueba).
+    if shap_values.ndim == 3:
+        shap_pos = shap_values[:, :, 1]
+    else:
+        shap_pos = shap_values
+
+    media_abs = np.abs(shap_pos).mean(axis=0)
+    orden = np.argsort(media_abs)[::-1]
+
+    variables = []
+    for idx in orden:
+        col = features[idx]
+        valores = X[col].to_numpy(dtype=float)
+        vmin, vmax = valores.min(), valores.max()
+        rango = vmax - vmin
+        if rango == 0:
+            normalizado = np.full_like(valores, 0.5)
+        else:
+            normalizado = (valores - vmin) / rango
+        variables.append({
+            "variable": col,
+            "media_abs_shap": float(media_abs[idx]),
+            "puntos": [
+                {"valor_shap": float(s), "valor_normalizado": float(n)}
+                for s, n in zip(shap_pos[:, idx], normalizado)
+            ],
+        })
+
+    return {"variables": variables, "filas_muestreadas": int(len(X))}

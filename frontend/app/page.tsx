@@ -39,6 +39,8 @@ import {
   LineChart,
   ReferenceLine,
   ResponsiveContainer,
+  Scatter,
+  ScatterChart,
   Tooltip,
   XAxis,
   YAxis,
@@ -401,6 +403,26 @@ function EstudiantesView({ onStudent }: { onStudent: (sel: SeleccionEstudiante) 
   </div>
 }
 
+// Color continuo para el punto de un summary plot SHAP: azul (valor bajo de
+// la variable) -> gris neutro -> rojo (valor alto), igual convencion que usa
+// la libreria shap en Python.
+function colorSHAP(t: number) {
+  const stops: [number, [number, number, number]][] = [
+    [0, [37, 99, 235]],
+    [0.5, [148, 163, 184]],
+    [1, [220, 38, 38]],
+  ]
+  const clamped = Math.max(0, Math.min(1, t))
+  let a = stops[0], b = stops[stops.length - 1]
+  for (let i = 0; i < stops.length - 1; i++) {
+    if (clamped >= stops[i][0] && clamped <= stops[i + 1][0]) { a = stops[i]; b = stops[i + 1]; break }
+  }
+  const span = b[0] - a[0]
+  const localT = span === 0 ? 0 : (clamped - a[0]) / span
+  const mix = (i: number) => Math.round(a[1][i] + (b[1][i] - a[1][i]) * localT)
+  return `rgb(${mix(0)}, ${mix(1)}, ${mix(2)})`
+}
+
 function ModeloMLView() {
   const [info, setInfo] = useState<ModelInfo | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -408,6 +430,25 @@ function ModeloMLView() {
   useEffect(() => {
     api.modelInfo().then(setInfo).catch((err) => setError(err instanceof Error ? err.message : String(err)))
   }, [])
+
+  // Beeswarm SHAP: aplana {variable, puntos[]} en una sola nube de puntos con
+  // jitter vertical (para que no se apilen exactamente en la misma fila) y
+  // conserva el orden de variables (ya viene del backend de mas a menos
+  // influyente) para las etiquetas del eje Y.
+  const shapChart = useMemo(() => {
+    const variables = info?.shap_variables
+    if (!variables || variables.length === 0) return null
+    const n = variables.length
+    const puntos = variables.flatMap((v, i) =>
+      v.puntos.map((p) => ({
+        x: p.valor_shap,
+        y: (n - 1 - i) + (Math.random() - 0.5) * 0.7,
+        normalizado: p.valor_normalizado,
+        variable: v.variable,
+      }))
+    )
+    return { puntos, etiquetas: variables.map((v) => v.variable), n }
+  }, [info?.shap_variables])
 
   if (error) return <ErrorPanel mensaje={error} />
   if (!info) return <CargandoPanel label="Consultando el modelo entrenado…" />
@@ -478,6 +519,47 @@ function ModeloMLView() {
           </BarChart>
         </ResponsiveContainer>
       </div>
+    </section>}
+    {shapChart && <section className="relative overflow-hidden rounded-2xl border border-teal-100 bg-linear-to-br from-teal-50/40 via-white to-white p-5 shadow-sm">
+      <div className="pointer-events-none absolute -right-12 -top-14 h-48 w-48 rounded-full bg-linear-to-br from-teal-300/30 to-blue-200/20 blur-3xl" />
+      <h2 className="relative font-bold text-slate-900">Importancia por SHAP (dirección del efecto)</h2>
+      <p className="relative mt-1 text-sm text-slate-500">Cada punto es una combinación estudiante-materia muestreada{info.shap_filas_muestreadas != null ? ` (n=${info.shap_filas_muestreadas})` : ''}. A la derecha del cero, esa variable empujó la predicción hacia "reprueba"; a la izquierda, hacia "aprueba".</p>
+      <div className="relative mt-3 flex items-center gap-2 text-xs text-slate-500">
+        <span>Valor de la variable:</span>
+        <span className="h-2.5 w-24 rounded-full bg-linear-to-r from-blue-600 via-slate-300 to-rose-600" />
+        <span>Bajo</span><span className="text-slate-300">·</span><span>Alto</span>
+      </div>
+      <div className="relative mt-4 w-full" style={{ height: Math.max(240, shapChart.n * 34) }}>
+        <ResponsiveContainer width="100%" height="100%">
+          <ScatterChart margin={{ left: 8, right: 24, top: 8, bottom: 4 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+            <XAxis dataKey="x" type="number" tick={{ fontSize: 11 }} tickFormatter={(v: number) => v.toFixed(2)} />
+            <YAxis
+              dataKey="y" type="number" domain={[-0.5, shapChart.n - 0.5]}
+              ticks={shapChart.etiquetas.map((_, i) => shapChart.n - 1 - i)}
+              tickFormatter={(v: number) => shapChart.etiquetas[shapChart.n - 1 - Math.round(v)] ?? ''}
+              width={160} tick={{ fontSize: 11 }} interval={0}
+            />
+            <Tooltip
+              cursor={{ strokeDasharray: '3 3' }}
+              content={({ active, payload }: any) => {
+                if (!active || !payload || !payload.length) return null
+                const p = payload[0].payload
+                return <div className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs shadow-md">
+                  <p className="font-semibold text-slate-800">{p.variable}</p>
+                  <p className="mt-0.5 text-slate-500">Impacto SHAP: <b className="text-slate-700">{p.x.toFixed(3)}</b></p>
+                </div>
+              }}
+            />
+            <ReferenceLine x={0} stroke="#94a3b8" strokeDasharray="4 4" />
+            <Scatter
+              data={shapChart.puntos}
+              shape={(props: any) => <circle cx={props.cx} cy={props.cy} r={3} fill={colorSHAP(props.payload.normalizado)} fillOpacity={0.75} stroke="none" />}
+            />
+          </ScatterChart>
+        </ResponsiveContainer>
+      </div>
+      <p className="relative mt-2 text-xs text-slate-400">SHAP (SHapley Additive exPlanations) reparte, para cada caso, cuánto empujó cada variable la probabilidad final — a diferencia de la impureza Gini, sí muestra si ese empujón fue a favor o en contra del riesgo.</p>
     </section>}
     <section className="rounded-2xl border border-violet-100 bg-linear-to-br from-violet-50/40 via-white to-white p-5 shadow-sm"><h2 className="font-bold text-slate-900">Variables que usa el modelo</h2><div className="mt-4 flex flex-wrap gap-2">{info.features.map((f, i) => <span key={f} className={`rounded-lg px-3 py-2 text-xs font-medium ${TAG_TONES[i % TAG_TONES.length]}`}>{f}</span>)}</div></section>
   </div>
