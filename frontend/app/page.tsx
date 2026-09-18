@@ -35,6 +35,7 @@ import {
   Bar,
   BarChart,
   CartesianGrid,
+  Cell,
   Line,
   LineChart,
   ReferenceLine,
@@ -51,6 +52,7 @@ import {
   type DashboardSummary,
   type EstudianteDetalle,
   type ExplicacionPrediccion,
+  type HistogramaProbabilidad,
   type MateriaResumen,
   type ModelInfo,
 } from '@/lib/api'
@@ -339,6 +341,7 @@ function MateriasView() {
 
 function EstudiantesView({ onStudent }: { onStudent: (sel: SeleccionEstudiante) => void }) {
   const [alerts, setAlerts] = useState<AlertaOut[] | null>(null)
+  const [histograma, setHistograma] = useState<HistogramaProbabilidad | null>(null)
   const [anio, setAnio] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [filtro, setFiltro] = useState('')
@@ -348,8 +351,11 @@ function EstudiantesView({ onStudent }: { onStudent: (sel: SeleccionEstudiante) 
     ;(async () => {
       try {
         const resumen = await api.dashboardSummary()
-        const pagina = await api.alerts({ anio: resumen.anio, risk: 'Todos', limit: 200 })
-        if (!cancelado) { setAnio(resumen.anio); setAlerts(pagina.items) }
+        const [pagina, hist] = await Promise.all([
+          api.alerts({ anio: resumen.anio, risk: 'Todos', limit: 200 }),
+          api.probabilityHistogram(resumen.anio),
+        ])
+        if (!cancelado) { setAnio(resumen.anio); setAlerts(pagina.items); setHistograma(hist) }
       } catch (err) {
         if (!cancelado) setError(err instanceof Error ? err.message : String(err))
       }
@@ -370,8 +376,60 @@ function EstudiantesView({ onStudent }: { onStudent: (sel: SeleccionEstudiante) 
     ? alerts.filter((a) => a.materia.toLowerCase().includes(filtro.trim().toLowerCase()) || String(a.cod_estudiante).includes(filtro.trim()))
     : alerts
 
+  // Histograma de probabilidad: cada barra es un tramo de 5 puntos porcentuales
+  // sobre TODAS las predicciones (no solo las que llegaron a ser alerta), para
+  // ver si el riesgo se concentra en un grupo chico o se reparte de forma
+  // gradual. El color de cada barra sigue el mismo umbral que separa
+  // Bajo/Medio/Alto en el resto del dashboard.
+  const umbralMedio = histograma?.umbral_medio ?? 0.3
+  const umbralAlto = histograma?.umbral_alto ?? 0.5
+  const dataHistograma = (histograma?.bins ?? []).map((b) => ({
+    etiqueta: `${Math.round(b.desde * 100)}%`,
+    desde: b.desde, hasta: b.hasta, cantidad: b.cantidad,
+  }))
+  const colorBin = (desde: number, hasta: number) => {
+    const medio = (desde + hasta) / 2
+    if (medio >= umbralAlto) return '#e11d48'
+    if (medio >= umbralMedio) return '#d97706'
+    return '#059669'
+  }
+
   return <div className="space-y-6">
     <div><p className="text-sm font-medium text-blue-600">Año lectivo {anio}</p><h1 className="mt-1 text-3xl font-bold tracking-tight text-slate-950">Estudiantes en riesgo</h1><p className="mt-2 text-sm leading-6 text-slate-500">{alerts.length} alertas activas (riesgo alto o medio), calculadas sobre acumulado_desde_2020_al_2025_datos.csv.</p></div>
+    {dataHistograma.length > 0 && <section className="relative overflow-hidden rounded-2xl border border-violet-100 bg-linear-to-br from-violet-50/40 via-white to-white p-5 shadow-sm">
+      <div className="pointer-events-none absolute -right-12 -top-14 h-48 w-48 rounded-full bg-linear-to-br from-violet-300/30 to-blue-200/20 blur-3xl" />
+      <h2 className="relative font-bold text-slate-900">Histograma de probabilidad de riesgo</h2>
+      <p className="relative mt-1 text-sm text-slate-500">Distribución completa de las {histograma?.total.toLocaleString('es-CO') ?? '—'} predicciones del modelo (no solo las que llegaron a ser alerta): dice si el riesgo está concentrado en un grupo puntual o repartido de forma gradual.</p>
+      <div className="relative mt-3 flex flex-wrap items-center gap-4 text-xs text-slate-500">
+        <span className="flex items-center gap-1.5"><i className="h-2.5 w-2.5 rounded-full bg-emerald-600" />Bajo (&lt; {Math.round(umbralMedio * 100)}%)</span>
+        <span className="flex items-center gap-1.5"><i className="h-2.5 w-2.5 rounded-full bg-amber-600" />Medio</span>
+        <span className="flex items-center gap-1.5"><i className="h-2.5 w-2.5 rounded-full bg-rose-600" />Alto (&ge; {Math.round(umbralAlto * 100)}%)</span>
+      </div>
+      <div className="relative mt-4 h-72 w-full">
+        <ResponsiveContainer width="100%" height="100%">
+          <BarChart data={dataHistograma} margin={{ left: 8, right: 16, top: 8 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+            <XAxis dataKey="etiqueta" tick={{ fontSize: 10 }} interval={1} />
+            <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
+            <Tooltip
+              cursor={{ fill: 'rgba(148,163,184,0.12)' }}
+              content={({ active, payload }: any) => {
+                if (!active || !payload || !payload.length) return null
+                const p = payload[0].payload
+                return <div className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs shadow-md">
+                  <p className="font-semibold text-slate-800">{Math.round(p.desde * 100)}%–{Math.round(p.hasta * 100)}%</p>
+                  <p className="mt-0.5 text-slate-500">{p.cantidad.toLocaleString('es-CO')} predicciones</p>
+                </div>
+              }}
+            />
+            <Bar dataKey="cantidad" radius={[3, 3, 0, 0]}>
+              {dataHistograma.map((d, i) => <Cell key={i} fill={colorBin(d.desde, d.hasta)} />)}
+            </Bar>
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+      <p className="relative mt-2 text-xs text-slate-400">Barras concentradas en un tramo angosto y alto: el riesgo está localizado en un grupo pequeño (conviene un foco puntual). Barras repartidas a lo largo de todo el eje: conviene un seguimiento más amplio.</p>
+    </section>}
     <section className="relative overflow-hidden rounded-2xl border border-rose-100 bg-linear-to-br from-rose-50/40 via-white to-white p-5 shadow-sm">
       <div className="pointer-events-none absolute -right-12 -top-14 h-48 w-48 rounded-full bg-linear-to-br from-rose-300/25 to-amber-200/15 blur-3xl" />
       <h2 className="relative font-bold text-slate-900">Alertas por curso</h2>

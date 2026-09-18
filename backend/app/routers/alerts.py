@@ -2,8 +2,8 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.schemas import AlertasPage
-from app.services import get_alerts
+from app.schemas import AlertasPage, HistogramaProbabilidad
+from app.services import get_alerts, get_probability_histogram
 
 router = APIRouter(prefix="/api/alerts", tags=["alerts"])
 
@@ -19,3 +19,12 @@ def listar_alertas(
 ):
     total, items = get_alerts(db, anio=anio, risk=risk, search=search, limit=limit, offset=offset)
     return AlertasPage(total=total, items=items)
+
+
+@router.get("/histograma", response_model=HistogramaProbabilidad)
+def histograma_probabilidad(
+    anio: str | None = Query(None),
+    bins: int = Query(20, ge=5, le=50),
+    db: Session = Depends(get_db),
+):
+    return HistogramaProbabilidad(**get_probability_histogram(db, anio=anio, bins=bins))

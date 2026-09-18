@@ -8,6 +8,7 @@ import pandas as pd
 from sqlalchemy import delete, func, or_, select
 from sqlalchemy.orm import Session
 
+from app.config import UMBRAL_ALTO, UMBRAL_MEDIO
 from app.ml.pipeline import (build_feature_table, calcular_shap_summary, evaluar_modelo,
                               load_model_bundle, score_features, tendencia_texto)
 from app.models import Grade, RiskAlert
@@ -263,6 +264,34 @@ def get_alerts(db: Session, anio: str | None = None, risk: str = "Todos",
         for f in filas
     ]
     return total, items
+
+
+def get_probability_histogram(db: Session, anio: str | None = None, bins: int = 20) -> dict:
+    """Histograma de 'probabilidad_riesgo' sobre TODAS las predicciones
+    calculadas (no solo las que llegaron a ser alerta Alto/Medio, a
+    diferencia de get_alerts): la forma completa de la distribucion dice si
+    el riesgo esta concentrado en un grupo chico (foco puntual) o repartido
+    de forma gradual (seguimiento amplio)."""
+    query = select(RiskAlert.probabilidad_riesgo)
+    if anio:
+        query = query.where(RiskAlert.anio == anio)
+    valores = db.execute(query).scalars().all()
+
+    ancho = 1.0 / bins
+    conteos = [0] * bins
+    for v in valores:
+        idx = min(int(v / ancho), bins - 1) if v >= 0 else 0
+        conteos[idx] += 1
+
+    return {
+        "bins": [
+            {"desde": round(i * ancho, 4), "hasta": round((i + 1) * ancho, 4), "cantidad": conteos[i]}
+            for i in range(bins)
+        ],
+        "total": len(valores),
+        "umbral_medio": UMBRAL_MEDIO,
+        "umbral_alto": UMBRAL_ALTO,
+    }
 
 
 def get_subjects_summary(db: Session, anio: str | None = None) -> list[dict]:

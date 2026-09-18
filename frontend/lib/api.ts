@@ -60,6 +60,19 @@ export interface AlertasPage {
   items: AlertaOut[]
 }
 
+export interface BinHistograma {
+  desde: number
+  hasta: number
+  cantidad: number
+}
+
+export interface HistogramaProbabilidad {
+  bins: BinHistograma[]
+  total: number
+  umbral_medio: number
+  umbral_alto: number
+}
+
 export interface PeriodoNota {
   periodo: number
   valor: number
@@ -175,6 +188,13 @@ export const api = {
     if (params.search) qs.set('search', params.search)
     qs.set('limit', String(params.limit ?? 20))
     return apiGet<AlertasPage>(`/api/alerts?${qs.toString()}`)
+  },
+
+  probabilityHistogram: (anio?: string, bins = 20) => {
+    const qs = new URLSearchParams()
+    if (anio) qs.set('anio', anio)
+    qs.set('bins', String(bins))
+    return apiGet<HistogramaProbabilidad>(`/api/alerts/histograma?${qs.toString()}`)
   },
 
   subjects: (anio?: string) =>

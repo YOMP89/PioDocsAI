@@ -55,6 +55,19 @@ class AlertasPage(BaseModel):
     items: list[AlertaOut]
 
 
+class BinHistograma(BaseModel):
+    desde: float  # probabilidad (0-1)
+    hasta: float
+    cantidad: int
+
+
+class HistogramaProbabilidad(BaseModel):
+    bins: list[BinHistograma]
+    total: int
+    umbral_medio: float
+    umbral_alto: float
+
+
 class PeriodoNota(BaseModel):
     periodo: int
     valor: float
