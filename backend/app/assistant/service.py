@@ -24,8 +24,10 @@ from app.services import get_materia_detalle, obtener_tema_materia
 
 logger = logging.getLogger("eduapp.assistant")
 
-MAX_TOOL_ITERATIONS = 6
-MAX_HISTORY_MESSAGES = 12  # ultimos N mensajes de la conversacion (usuario+asistente)
+MAX_TOOL_ITERATIONS = 4
+MAX_HISTORY_MESSAGES = 8  # ultimos N mensajes de la conversacion (usuario+asistente)
+CHAT_REASONING_EFFORT = "low"  # este asistente solo orquesta tools y redacta 2-5 frases: no necesita razonamiento profundo
+CHAT_MAX_OUTPUT_TOKENS = 700
 
 SYSTEM_PROMPT = """Eres Pío Docs, el asistente de PioDocsAI, el sistema de \
 deteccion temprana de riesgo academico del Colegio Franciscano Pio XII.
@@ -105,15 +107,21 @@ def chat(db: Session, message: str, history: list[dict] | None = None) -> dict:
     input_items.append({"role": "user", "content": message})
 
     chart: dict | None = None
+    previous_response_id: str | None = None
 
     for _ in range(MAX_TOOL_ITERATIONS):
-        response = _create(
-            client,
+        kwargs: dict = dict(
             model=OPENAI_MODEL,
             instructions=SYSTEM_PROMPT,
             input=input_items,
             tools=_tools_openai(),
+            reasoning={"effort": CHAT_REASONING_EFFORT},
+            max_output_tokens=CHAT_MAX_OUTPUT_TOKENS,
         )
+        if previous_response_id:
+            kwargs["previous_response_id"] = previous_response_id
+        response = _create(client, **kwargs)
+        previous_response_id = response.id
 
         function_calls = [item for item in response.output if item.type == "function_call"]
 
@@ -121,8 +129,10 @@ def chat(db: Session, message: str, history: list[dict] | None = None) -> dict:
             texto = (response.output_text or "").strip()
             return {"reply": texto or "No tengo una respuesta para eso.", "chart": chart}
 
-        input_items += response.output
-
+        # Ya no hace falta reenviar el historial ni los outputs anteriores:
+        # previous_response_id le da continuidad del lado de OpenAI. Solo
+        # mandamos los resultados de las tools que acaba de pedir.
+        input_items = []
         for call in function_calls:
             name = call.name
             try:
@@ -223,6 +233,7 @@ def explicar_prediccion(db: Session, anio: str, cod_estudiante: int, materia: st
             "content": "Estos son los datos reales de la prediccion (no inventes otros):\n"
                        + json.dumps(contexto, ensure_ascii=False, indent=2),
         }],
+        reasoning={"effort": "low"},
         text={
             "format": {
                 "type": "json_schema",
@@ -292,6 +303,7 @@ def explicar_materia(db: Session, materia: str, anio: str | None = None) -> dict
             "content": "Estos son los datos reales agregados de la materia (no inventes otros):\n"
                        + json.dumps(detalle, ensure_ascii=False, indent=2),
         }],
+        reasoning={"effort": "low"},
         text={
             "format": {
                 "type": "json_schema",
